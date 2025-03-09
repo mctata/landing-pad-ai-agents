@@ -1,0 +1,64 @@
+{
+  "name": "landing-pad-ai-agents",
+  "version": "1.0.0",
+  "description": "AI agent framework for automating content operations at Landing Pad Digital",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest",
+    "db:init": "node scripts/db-init.js",
+    "lint": "eslint .",
+    "agent:strategy": "node src/cli/agent-commands.js content_strategy",
+    "agent:creation": "node src/cli/agent-commands.js content_creation",
+    "agent:management": "node src/cli/agent-commands.js content_management",
+    "agent:optimisation": "node src/cli/agent-commands.js optimisation",
+    "agent:brand": "node src/cli/agent-commands.js brand_consistency"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mctata/landing-pad-ai-agents.git"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "content",
+    "marketing",
+    "automation"
+  ],
+  "author": "Landing Pad Digital",
+  "license": "UNLICENSED",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/mctata/landing-pad-ai-agents/issues"
+  },
+  "homepage": "https://github.com/mctata/landing-pad-ai-agents#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.15.0",
+    "amqplib": "^0.10.3",
+    "aws-sdk": "^2.1575.0",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "joi": "^17.12.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.4.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.29.0",
+    "redis": "^4.6.13",
+    "winston": "^3.12.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0",
+    "supertest": "^6.3.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
