@@ -1,0 +1,79 @@
+{
+  "primary": {
+    "type": "mongodb",
+    "connection_string": "${MONGODB_URI}",
+    "database": "landing_pad_ai_agents",
+    "options": {
+      "useNewUrlParser": true,
+      "useUnifiedTopology": true,
+      "retryWrites": true
+    }
+  },
+  "collections": {
+    "agents": {
+      "indexes": [
+        { "fields": { "name": 1 }, "options": { "unique": true } }
+      ]
+    },
+    "content_briefs": {
+      "indexes": [
+        { "fields": { "created_at": 1 } },
+        { "fields": { "status": 1 } },
+        { "fields": { "type": 1 } }
+      ]
+    },
+    "content": {
+      "indexes": [
+        { "fields": { "created_at": 1 } },
+        { "fields": { "status": 1 } },
+        { "fields": { "type": 1 } },
+        { "fields": { "brief_id": 1 } }
+      ]
+    },
+    "publications": {
+      "indexes": [
+        { "fields": { "content_id": 1 } },
+        { "fields": { "platform": 1 } },
+        { "fields": { "scheduled_at": 1 } },
+        { "fields": { "status": 1 } }
+      ]
+    },
+    "optimisation_reports": {
+      "indexes": [
+        { "fields": { "content_id": 1 } },
+        { "fields": { "created_at": 1 } }
+      ]
+    },
+    "brand_evaluations": {
+      "indexes": [
+        { "fields": { "content_id": 1 } },
+        { "fields": { "created_at": 1 } }
+      ]
+    },
+    "workflows": {
+      "indexes": [
+        { "fields": { "started_at": 1 } },
+        { "fields": { "status": 1 } }
+      ]
+    },
+    "users": {
+      "indexes": [
+        { "fields": { "email": 1 }, "options": { "unique": true } }
+      ]
+    }
+  },
+  "file_storage": {
+    "type": "s3",
+    "bucket": "${S3_BUCKET}",
+    "region": "${AWS_REGION}",
+    "access_key_id": "${AWS_ACCESS_KEY_ID}",
+    "secret_access_key": "${AWS_SECRET_ACCESS_KEY}"
+  },
+  "cache": {
+    "type": "redis",
+    "host": "${REDIS_HOST}",
+    "port": "${REDIS_PORT}",
+    "password": "${REDIS_PASSWORD}",
+    "ttl": 3600
+  }
+}
