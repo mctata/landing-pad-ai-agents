@@ -26,6 +26,184 @@ These agents work together through a shared message bus and knowledge repository
 - MongoDB 6.0 or higher
 - RabbitMQ 3.10 or higher
 - Python 3.10 or higher (for analytics components)
+- API keys for AI services (Anthropic Claude and OpenAI)
+
+### Installing Prerequisites
+
+#### 1. Node.js
+
+**On Ubuntu/Debian:**
+```bash
+# Add NodeSource repository
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+
+# Install Node.js
+sudo apt-get install -y nodejs
+
+# Verify installation
+node --version  # Should show v18.x.x
+npm --version   # Should show 8.x.x or higher
+```
+
+**On macOS (using Homebrew):**
+```bash
+# Install Homebrew if you don't have it
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Node.js
+brew install node@18
+
+# Add to PATH if needed
+echo 'export PATH="/usr/local/opt/node@18/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Verify installation
+node --version
+npm --version
+```
+
+**On Windows:**
+1. Download the Node.js installer from [nodejs.org](https://nodejs.org/)
+2. Run the installer and follow the installation wizard
+3. Open Command Prompt or PowerShell and verify installation:
+   ```
+   node --version
+   npm --version
+   ```
+
+#### 2. MongoDB
+
+**On Ubuntu/Debian:**
+```bash
+# Import MongoDB public GPG key
+wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
+
+# Create list file for MongoDB
+echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+
+# Reload local package database
+sudo apt-get update
+
+# Install MongoDB packages
+sudo apt-get install -y mongodb-org
+
+# Start MongoDB service
+sudo systemctl start mongod
+
+# Enable MongoDB to start on boot
+sudo systemctl enable mongod
+
+# Verify installation
+mongod --version
+```
+
+**On macOS (using Homebrew):**
+```bash
+# Install MongoDB
+brew tap mongodb/brew
+brew install mongodb-community@6.0
+
+# Start MongoDB service
+brew services start mongodb-community@6.0
+
+# Verify installation
+mongod --version
+```
+
+**On Windows:**
+1. Download the MongoDB Community Server installer from [MongoDB Download Center](https://www.mongodb.com/try/download/community)
+2. Run the installer and follow the installation wizard
+3. Choose "Complete" installation and select "Install MongoDB as a Service"
+4. Verify installation by opening MongoDB Compass (installed with MongoDB)
+
+#### 3. RabbitMQ
+
+**On Ubuntu/Debian:**
+```bash
+# Add RabbitMQ repository
+curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.deb.sh | sudo bash
+
+# Install RabbitMQ
+sudo apt-get install -y rabbitmq-server
+
+# Start RabbitMQ service
+sudo systemctl start rabbitmq-server
+sudo systemctl enable rabbitmq-server
+
+# Enable RabbitMQ management plugin (optional)
+sudo rabbitmq-plugins enable rabbitmq_management
+
+# Create admin user (optional)
+sudo rabbitmqctl add_user admin your_password
+sudo rabbitmqctl set_user_tags admin administrator
+sudo rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+
+# Verify installation
+sudo rabbitmqctl status
+```
+
+**On macOS (using Homebrew):**
+```bash
+# Install RabbitMQ
+brew install rabbitmq
+
+# Start RabbitMQ service
+brew services start rabbitmq
+
+# Verify installation
+rabbitmqctl status
+```
+
+**On Windows:**
+1. Install Erlang first from [Erlang Solutions](https://www.erlang.org/downloads)
+2. Download and install RabbitMQ from [RabbitMQ Website](https://www.rabbitmq.com/install-windows.html)
+3. After installation, RabbitMQ service should start automatically
+4. To verify, open a Command Prompt as Administrator and run:
+   ```
+   rabbitmqctl.bat status
+   ```
+
+#### 4. Python (for analytics components)
+
+**On Ubuntu/Debian:**
+```bash
+# Install Python 3.10
+sudo apt-get install -y python3.10 python3.10-venv python3-pip
+
+# Verify installation
+python3.10 --version
+```
+
+**On macOS (using Homebrew):**
+```bash
+# Install Python 3.10
+brew install python@3.10
+
+# Verify installation
+python3.10 --version
+```
+
+**On Windows:**
+1. Download Python 3.10 installer from [python.org](https://www.python.org/downloads/release/python-3100/)
+2. Run the installer and make sure to check "Add Python to PATH"
+3. Open Command Prompt and verify installation:
+   ```
+   python --version
+   ```
+
+#### 5. AI API Keys
+
+1. **Anthropic Claude API Key**:
+   - Sign up for an account at [Anthropic's website](https://www.anthropic.com/)
+   - Navigate to the API section of your account
+   - Generate a new API key
+   - Save this key securely for use in the `.env` file
+
+2. **OpenAI API Key**:
+   - Sign up for an account at [OpenAI's website](https://openai.com/)
+   - Navigate to the API section in your account settings
+   - Create a new secret key
+   - Save this key securely for use in the `.env` file
 
 ### Setup Steps
 
@@ -46,6 +224,24 @@ These agents work together through a shared message bus and knowledge repository
    # Edit .env with your configuration settings
    ```
 
+   Essential settings to configure in your `.env` file:
+   ```
+   # MongoDB Connection
+   MONGODB_URI=mongodb://localhost:27017/landing_pad_ai_agents
+   
+   # RabbitMQ Connection
+   RABBITMQ_URI=amqp://localhost
+   
+   # AI Service API Keys
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here
+   
+   # Application Settings
+   NODE_ENV=development
+   PORT=3000
+   LOG_LEVEL=info
+   ```
+
 4. Initialize the database:
    ```bash
    npm run db:init
@@ -55,6 +251,39 @@ These agents work together through a shared message bus and knowledge repository
    ```bash
    npm run start
    ```
+
+   For development with auto-restart:
+   ```bash
+   npm run dev
+   ```
+
+## Verifying Your Installation
+
+After starting the system, you should be able to:
+
+1. Access the admin interface at http://localhost:3000/admin
+2. See agent logs in the console or logs directory
+3. Run a simple test to verify all agents are functioning:
+   ```bash
+   npm run test:system
+   ```
+
+### Testing Individual Agents
+
+You can test individual agents using these commands:
+
+```bash
+# Test Content Strategy Agent
+npm run agent:strategy -- test
+
+# Test Content Creation Agent
+npm run agent:creation -- test
+
+# Test other agents...
+npm run agent:management -- test
+npm run agent:optimisation -- test
+npm run agent:brand -- test
+```
 
 ## Configuration
 
@@ -170,10 +399,11 @@ These examples demonstrate the capabilities of the agent system and provide temp
 
 ### Common Issues
 
-- **Messaging Errors**: Check RabbitMQ status and connection settings
+- **Messaging Errors**: Check RabbitMQ status and connection settings with `rabbitmqctl status`
 - **Agent Unresponsive**: Verify agent process is running and check logs
 - **Content Generation Failed**: Ensure AI models are accessible and API keys are valid
 - **Performance Data Missing**: Check analytics integration configurations
+- **Database Connection Issues**: Verify MongoDB is running with `mongo --eval "db.serverStatus()"`
 
 ### Logging
 
