@@ -1,0 +1,148 @@
+{
+  "content_strategy": {
+    "enabled": true,
+    "priorities": ["audience_relevance", "brand_goals", "seo_performance"],
+    "data_sources": ["google_analytics", "search_console", "social_media_insights"],
+    "refresh_interval": 3600,
+    "max_concurrent_tasks": 5,
+    "ai_model": {
+      "provider": "openai",
+      "model": "gpt-4-turbo",
+      "temperature": 0.3,
+      "max_tokens": 2000
+    },
+    "modules": {
+      "trend_analyzer": {
+        "enabled": true,
+        "refresh_interval": 86400,
+        "data_retention_days": 90
+      },
+      "audience_insights": {
+        "enabled": true,
+        "primary_segments": ["small_business", "freelancers", "marketing_agencies"],
+        "data_sources": ["customer_surveys", "website_behavior", "social_engagement"]
+      },
+      "brief_generator": {
+        "enabled": true,
+        "templates": ["blog_post", "landing_page", "social_campaign", "email_newsletter"],
+        "required_sections": ["target_audience", "key_messages", "content_structure", "keywords"]
+      }
+    }
+  },
+  "content_creation": {
+    "enabled": true,
+    "content_types": ["blog", "social", "landing_page", "email"],
+    "max_concurrent_tasks": 3,
+    "ai_model": {
+      "provider": "anthropic",
+      "model": "claude-3-opus-20240229",
+      "temperature": 0.7,
+      "max_tokens": 4000
+    },
+    "modules": {
+      "blog_generator": {
+        "enabled": true,
+        "formats": ["how_to", "listicle", "case_study", "thought_leadership"],
+        "min_word_count": 800,
+        "max_word_count": 2500
+      },
+      "social_media_generator": {
+        "enabled": true,
+        "platforms": ["twitter", "linkedin", "facebook", "instagram"],
+        "content_per_platform": 3
+      },
+      "landing_page_generator": {
+        "enabled": true,
+        "sections": ["hero", "features", "benefits", "testimonials", "cta"],
+        "tone": "professional"
+      }
+    }
+  },
+  "content_management": {
+    "enabled": true,
+    "platforms": ["wordpress", "social_media", "email_marketing"],
+    "publishing_schedule": {
+      "blog": ["monday", "wednesday", "friday"],
+      "social": ["daily"],
+      "email": ["thursday"]
+    },
+    "max_scheduled_content": 30,
+    "modules": {
+      "scheduler": {
+        "enabled": true,
+        "look_ahead_days": 14,
+        "publishing_times": {
+          "blog": "09:00",
+          "social": ["07:00", "12:00", "17:00"],
+          "email": "10:00"
+        }
+      },
+      "publisher": {
+        "enabled": true,
+        "auto_publish": true,
+        "retry_attempts": 3,
+        "require_approval": true
+      },
+      "content_repository": {
+        "enabled": true,
+        "storage_type": "mongodb",
+        "versioning": true,
+        "backup_frequency": "daily"
+      }
+    }
+  },
+  "optimisation": {
+    "enabled": true,
+    "metrics": ["traffic", "engagement", "conversion", "ranking"],
+    "analysis_period_days": 30,
+    "auto_improve": true,
+    "modules": {
+      "seo_analyzer": {
+        "enabled": true,
+        "on_page_factors": ["keywords", "headings", "meta_tags", "content_quality"],
+        "off_page_factors": ["backlinks", "social_signals"]
+      },
+      "performance_tracker": {
+        "enabled": true,
+        "metrics": ["page_views", "time_on_page", "bounce_rate", "conversions"],
+        "comparison_window_days": 90
+      },
+      "recommendation_engine": {
+        "enabled": true,
+        "recommendation_types": ["content_improvements", "topic_ideas", "distribution_channels"],
+        "max_recommendations": 10
+      }
+    }
+  },
+  "brand_consistency": {
+    "enabled": true,
+    "brand_guidelines_path": "assets/brand/guidelines.md",
+    "check_levels": ["mandatory", "recommended"],
+    "modules": {
+      "tone_analyzer": {
+        "enabled": true,
+        "tone_attributes": ["professional", "helpful", "innovative", "trustworthy"],
+        "min_compliance_score": 0.8
+      },
+      "message_validator": {
+        "enabled": true,
+        "key_messages": [
+          "AI-powered website creation",
+          "Time-saving solutions",
+          "Professional results",
+          "No coding required"
+        ],
+        "prohibited_claims": [
+          "guaranteed success",
+          "best on the market",
+          "instant results"
+        ]
+      },
+      "brand_guidelines": {
+        "enabled": true,
+        "elements": ["logo_usage", "color_palette", "typography", "voice_and_tone"],
+        "update_frequency": "monthly"
+      }
+    }
+  }
+}
