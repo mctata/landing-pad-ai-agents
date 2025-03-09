@@ -1,0 +1,90 @@
+{
+  "broker": {
+    "type": "rabbitmq",
+    "host": "${RABBITMQ_HOST}",
+    "port": "${RABBITMQ_PORT}",
+    "username": "${RABBITMQ_USERNAME}",
+    "password": "${RABBITMQ_PASSWORD}",
+    "vhost": "landing-pad",
+    "ssl": true
+  },
+  "exchanges": {
+    "agent_commands": {
+      "type": "direct",
+      "durable": true
+    },
+    "agent_events": {
+      "type": "topic",
+      "durable": true
+    },
+    "content_updates": {
+      "type": "fanout",
+      "durable": true
+    }
+  },
+  "queues": {
+    "content_strategy_commands": {
+      "binding": {
+        "exchange": "agent_commands",
+        "routing_key": "content_strategy"
+      },
+      "durable": true,
+      "prefetch": 5
+    },
+    "content_creation_commands": {
+      "binding": {
+        "exchange": "agent_commands",
+        "routing_key": "content_creation"
+      },
+      "durable": true,
+      "prefetch": 3
+    },
+    "content_management_commands": {
+      "binding": {
+        "exchange": "agent_commands",
+        "routing_key": "content_management"
+      },
+      "durable": true,
+      "prefetch": 5
+    },
+    "optimisation_commands": {
+      "binding": {
+        "exchange": "agent_commands",
+        "routing_key": "optimisation"
+      },
+      "durable": true,
+      "prefetch": 5
+    },
+    "brand_consistency_commands": {
+      "binding": {
+        "exchange": "agent_commands",
+        "routing_key": "brand_consistency"
+      },
+      "durable": true,
+      "prefetch": 5
+    }
+  },
+  "message_schemas": {
+    "command": {
+      "id": "string",
+      "type": "string",
+      "agent": "string",
+      "payload": "object",
+      "timestamp": "datetime",
+      "correlation_id": "string"
+    },
+    "event": {
+      "id": "string",
+      "type": "string",
+      "agent": "string",
+      "payload": "object",
+      "timestamp": "datetime",
+      "correlation_id": "string"
+    }
+  },
+  "retry": {
+    "max_attempts": 3,
+    "initial_interval": 1000,
+    "multiplier": 2
+  }
+}
