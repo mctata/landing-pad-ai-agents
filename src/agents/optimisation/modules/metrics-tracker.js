@@ -10,22 +10,20 @@ class MetricsTracker extends BaseModule {
     super(config, storage, logger);
     this.name = 'metrics_tracker';
     
-    // Define standard metrics for validation
-    this.standardMetrics = [
-      'views', 
-      'unique_views', 
-      'clicks',
-      'conversions',
-      'bounce_rate',
-      'avg_time_on_page',
-      'scroll_depth',
-      'engagement_rate',
-      'conversion_rate',
-      'social_shares',
-      'comments',
-      'likes',
-      'backlinks'
-    ];
+    // Define valid metrics and their validation rules
+    this.validMetrics = {
+      views: { type: 'number', min: 0 },
+      unique_views: { type: 'number', min: 0 },
+      clicks: { type: 'number', min: 0 },
+      engagement_rate: { type: 'number', min: 0, max: 1 },
+      conversion_rate: { type: 'number', min: 0, max: 1 },
+      bounce_rate: { type: 'number', min: 0, max: 1 },
+      avg_time_on_page: { type: 'number', min: 0 },
+      social_shares: { type: 'number', min: 0 },
+      comments: { type: 'number', min: 0 },
+      likes: { type: 'number', min: 0 },
+      backlinks: { type: 'number', min: 0 }
+    };
   }
 
   async initialize() {
@@ -33,7 +31,7 @@ class MetricsTracker extends BaseModule {
     
     this.logger.info('Initializing metrics tracker module');
     
-    // Create performance metrics collection if it doesn't exist
+    // Create collection for performance metrics if it doesn't exist
     if (!this.storage.collections.performance_metrics) {
       await this.storage.db.createCollection('performance_metrics');
       this.storage.collections.performance_metrics = this.storage.db.collection('performance_metrics');
@@ -48,14 +46,17 @@ class MetricsTracker extends BaseModule {
   }
 
   /**
-   * Track metrics for content
+   * Track content metrics
    * 
-   * @param {string} contentId - ID of the content
+   * @param {string} contentId - ID of the content to track metrics for
    * @param {Object} metrics - Metrics to track
    * @returns {Object} Tracking result
    */
   async trackMetrics(contentId, metrics) {
-    this.logger.info('Tracking metrics for content', { contentId });
+    this.logger.info('Tracking metrics for content', { 
+      contentId, 
+      metricKeys: Object.keys(metrics) 
+    });
     
     // Validate content ID
     if (!contentId) {
@@ -65,27 +66,24 @@ class MetricsTracker extends BaseModule {
     // Validate metrics
     const validatedMetrics = this._validateMetrics(metrics);
     
-    // Prepare record
+    // Create metrics record
     const metricsRecord = {
       content_id: this.storage.ObjectId(contentId),
       timestamp: new Date(),
       ...validatedMetrics
     };
     
-    // Store metrics
+    // Store metrics in database
     const result = await this.storage.collections.performance_metrics.insertOne(metricsRecord);
     
     this.logger.info('Metrics tracked successfully', { 
-      contentId,
-      metricCount: Object.keys(validatedMetrics).length,
-      recordId: result.insertedId
+      contentId, 
+      recordId: result.insertedId 
     });
     
-    // Calculate and update derived metrics
-    await this._updateDerivedMetrics(contentId);
-    
+    // Return success result
     return {
-      record_id: result.insertedId,
+      metrics_id: result.insertedId,
       content_id: contentId,
       metrics: validatedMetrics,
       timestamp: metricsRecord.timestamp
@@ -93,380 +91,310 @@ class MetricsTracker extends BaseModule {
   }
 
   /**
-   * Get metrics for content
+   * Get latest metrics for content
    * 
-   * @param {string} contentId - ID of the content
-   * @param {Object} options - Query options
-   * @returns {Array} Metrics records
+   * @param {string} contentId - Content ID to get metrics for
+   * @returns {Object} Latest metrics
    */
-  async getMetrics(contentId, options = {}) {
-    const { 
-      startDate = new Date(0), 
-      endDate = new Date(),
-      limit = 100,
-      sort = 'desc'
-    } = options;
+  async getLatestMetrics(contentId) {
+    this.logger.info('Getting latest metrics for content', { contentId });
     
-    this.logger.info('Getting metrics for content', { 
-      contentId,
-      startDate,
-      endDate,
-      limit
+    const result = await this.storage.collections.performance_metrics
+      .find({ content_id: this.storage.ObjectId(contentId) })
+      .sort({ timestamp: -1 })
+      .limit(1)
+      .toArray();
+    
+    if (result.length === 0) {
+      return null;
+    }
+    
+    const { _id, content_id, timestamp, ...metrics } = result[0];
+    
+    return {
+      metrics_id: _id,
+      content_id: content_id.toString(),
+      timestamp,
+      metrics
+    };
+  }
+
+  /**
+   * Get historical metrics for content
+   * 
+   * @param {string} contentId - Content ID to get metrics for
+   * @param {Object} options - Query options
+   * @param {Date} options.startDate - Start date for metrics
+   * @param {Date} options.endDate - End date for metrics
+   * @param {number} options.limit - Maximum number of records to return
+   * @returns {Array} Historical metrics
+   */
+  async getHistoricalMetrics(contentId, options = {}) {
+    const { startDate, endDate, limit = 100 } = options;
+    
+    this.logger.info('Getting historical metrics for content', { 
+      contentId, 
+      startDate, 
+      endDate, 
+      limit 
     });
     
-    // Build query
-    const query = { 
-      content_id: this.storage.ObjectId(contentId),
-      timestamp: { 
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      }
-    };
+    const query = { content_id: this.storage.ObjectId(contentId) };
     
-    // Execute query
-    const metrics = await this.storage.collections.performance_metrics
+    // Add date range if provided
+    if (startDate || endDate) {
+      query.timestamp = {};
+      
+      if (startDate) {
+        query.timestamp.$gte = new Date(startDate);
+      }
+      
+      if (endDate) {
+        query.timestamp.$lte = new Date(endDate);
+      }
+    }
+    
+    const results = await this.storage.collections.performance_metrics
       .find(query)
-      .sort({ timestamp: sort === 'desc' ? -1 : 1 })
+      .sort({ timestamp: -1 })
       .limit(limit)
       .toArray();
     
-    return metrics;
+    return results.map(record => {
+      const { _id, content_id, timestamp, ...metrics } = record;
+      
+      return {
+        metrics_id: _id,
+        content_id: content_id.toString(),
+        timestamp,
+        metrics
+      };
+    });
   }
 
   /**
-   * Get aggregated metrics for content
+   * Calculate aggregated metrics for a time period
    * 
-   * @param {string} contentId - ID of the content
-   * @param {string} timeframe - Timeframe to aggregate by (day, week, month)
-   * @returns {Array} Aggregated metrics
+   * @param {string} contentId - Content ID to aggregate metrics for
+   * @param {string} timeframe - Timeframe to aggregate (day, week, month, etc.)
+   * @returns {Object} Aggregated metrics
    */
-  async getAggregatedMetrics(contentId, timeframe = 'day') {
+  async getAggregatedMetrics(contentId, timeframe = 'week') {
     this.logger.info('Getting aggregated metrics for content', { 
-      contentId,
-      timeframe
+      contentId, 
+      timeframe 
     });
     
-    // Define grouping based on timeframe
-    let dateFormat;
-    switch (timeframe) {
-      case 'hour':
-        dateFormat = { year: '$year', month: '$month', day: '$dayOfMonth', hour: '$hour' };
-        break;
-      case 'day':
-        dateFormat = { year: '$year', month: '$month', day: '$dayOfMonth' };
-        break;
-      case 'week':
-        dateFormat = { year: '$year', week: '$week' };
-        break;
-      case 'month':
-        dateFormat = { year: '$year', month: '$month' };
-        break;
-      default:
-        dateFormat = { year: '$year', month: '$month', day: '$dayOfMonth' };
+    const startDate = this._getStartDateForTimeframe(timeframe);
+    
+    const query = { 
+      content_id: this.storage.ObjectId(contentId),
+      timestamp: { $gte: startDate }
+    };
+    
+    const records = await this.storage.collections.performance_metrics
+      .find(query)
+      .sort({ timestamp: -1 })
+      .toArray();
+    
+    if (records.length === 0) {
+      return null;
     }
     
     // Aggregate metrics
-    const aggregatedMetrics = await this.storage.collections.performance_metrics.aggregate([
-      {
-        $match: {
-          content_id: this.storage.ObjectId(contentId)
-        }
-      },
-      {
-        $group: {
-          _id: {
-            date: {
-              $dateFromParts: dateFormat
-            }
-          },
-          views: { $sum: '$views' },
-          unique_views: { $sum: '$unique_views' },
-          clicks: { $sum: '$clicks' },
-          conversions: { $sum: '$conversions' },
-          avg_time_on_page: { $avg: '$avg_time_on_page' },
-          bounce_rate: { $avg: '$bounce_rate' },
-          engagement_rate: { $avg: '$engagement_rate' },
-          conversion_rate: { $avg: '$conversion_rate' },
-          social_shares: { $sum: '$social_shares' },
-          comments: { $sum: '$comments' },
-          likes: { $sum: '$likes' }
-        }
-      },
-      {
-        $sort: {
-          '_id.date': 1
-        }
-      }
-    ]).toArray();
-    
-    // Format results
-    return aggregatedMetrics.map(item => ({
-      date: item._id.date,
-      metrics: {
-        views: item.views || 0,
-        unique_views: item.unique_views || 0,
-        clicks: item.clicks || 0,
-        conversions: item.conversions || 0,
-        avg_time_on_page: item.avg_time_on_page || 0,
-        bounce_rate: item.bounce_rate || 0,
-        engagement_rate: item.engagement_rate || 0,
-        conversion_rate: item.conversion_rate || 0,
-        social_shares: item.social_shares || 0,
-        comments: item.comments || 0,
-        likes: item.likes || 0
-      }
-    }));
-  }
-
-  /**
-   * Get comparative metrics across content types
-   * 
-   * @param {Array} contentTypes - Content types to compare
-   * @param {string} metric - Metric to compare
-   * @param {Object} options - Query options
-   * @returns {Object} Comparative metrics
-   */
-  async getComparativeMetrics(contentTypes, metric = 'views', options = {}) {
-    const {
-      startDate = new Date(new Date().setDate(new Date().getDate() - 30)),
-      endDate = new Date(),
-      limit = 10
-    } = options;
-    
-    this.logger.info('Getting comparative metrics', {
-      contentTypes,
-      metric,
-      startDate,
-      endDate
-    });
-    
-    // Get content items of specified types
-    const contentItems = await this.storage.collections.content_items.find({
-      type: { $in: contentTypes },
-      created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
-    }).toArray();
-    
-    // Get content IDs
-    const contentIds = contentItems.map(item => item._id);
-    
-    // Get metrics for each content type
-    const metricsByType = {};
-    for (const type of contentTypes) {
-      // Get content IDs for this type
-      const typeContentIds = contentItems
-        .filter(item => item.type === type)
-        .map(item => item._id);
-      
-      // Skip if no content of this type
-      if (typeContentIds.length === 0) {
-        metricsByType[type] = {
-          average: 0,
-          highest: 0,
-          lowest: 0,
-          total: 0,
-          sample_size: 0
-        };
-        continue;
-      }
-      
-      // Aggregate metrics for this type
-      const aggregation = await this.storage.collections.performance_metrics.aggregate([
-        {
-          $match: {
-            content_id: { $in: typeContentIds },
-            timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
-          }
-        },
-        {
-          $group: {
-            _id: '$content_id',
-            total: { $sum: `$${metric}` }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            average: { $avg: '$total' },
-            highest: { $max: '$total' },
-            lowest: { $min: '$total' },
-            total: { $sum: '$total' },
-            sample_size: { $sum: 1 }
-          }
-        }
-      ]).toArray();
-      
-      metricsByType[type] = aggregation.length > 0 ? aggregation[0] : {
-        average: 0,
-        highest: 0,
-        lowest: 0,
-        total: 0,
-        sample_size: 0
-      };
-      
-      // Remove _id field
-      delete metricsByType[type]._id;
-    }
-    
-    // Get top performing content
-    const topPerforming = await this.storage.collections.performance_metrics.aggregate([
-      {
-        $match: {
-          content_id: { $in: contentIds },
-          timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
-        }
-      },
-      {
-        $group: {
-          _id: '$content_id',
-          total: { $sum: `$${metric}` }
-        }
-      },
-      {
-        $sort: { total: -1 }
-      },
-      {
-        $limit: limit
-      }
-    ]).toArray();
-    
-    // Get content details for top performing content
-    const topContentIds = topPerforming.map(item => item._id);
-    const topContentDetails = await this.storage.collections.content_items.find({
-      _id: { $in: topContentIds }
-    }).toArray();
-    
-    // Combine metrics with content details
-    const topContent = topPerforming.map(item => {
-      const contentDetails = topContentDetails.find(content => 
-        content._id.toString() === item._id.toString()
-      );
-      
-      return {
-        content_id: item._id,
-        title: contentDetails ? contentDetails.title || contentDetails.headline : 'Unknown',
-        type: contentDetails ? contentDetails.type : 'Unknown',
-        value: item.total
-      };
-    });
+    const aggregatedMetrics = this._aggregateMetricsRecords(records);
     
     return {
-      metric,
-      by_type: metricsByType,
-      top_performing: topContent,
-      timeframe: {
-        start: startDate,
-        end: endDate
-      }
+      content_id: contentId,
+      timeframe,
+      start_date: startDate,
+      end_date: new Date(),
+      metrics: aggregatedMetrics,
+      record_count: records.length
     };
   }
 
   /**
-   * Validate metrics to ensure they follow expected format
+   * Batch track metrics for multiple content items
+   * 
+   * @param {Array} batchMetrics - Array of {contentId, metrics} objects
+   * @returns {Object} Batch tracking result
+   */
+  async batchTrackMetrics(batchMetrics) {
+    this.logger.info('Batch tracking metrics', { 
+      count: batchMetrics.length 
+    });
+    
+    const metricsRecords = [];
+    const errors = [];
+    
+    // Process each item in batch
+    for (const item of batchMetrics) {
+      try {
+        const { contentId, metrics } = item;
+        
+        // Validate content ID
+        if (!contentId) {
+          errors.push({ contentId, error: 'Content ID is required' });
+          continue;
+        }
+        
+        // Validate metrics
+        const validatedMetrics = this._validateMetrics(metrics);
+        
+        // Create metrics record
+        metricsRecords.push({
+          content_id: this.storage.ObjectId(contentId),
+          timestamp: new Date(),
+          ...validatedMetrics
+        });
+      } catch (error) {
+        errors.push({ contentId: item.contentId, error: error.message });
+      }
+    }
+    
+    // Insert all valid records in a single batch operation
+    if (metricsRecords.length > 0) {
+      const result = await this.storage.collections.performance_metrics.insertMany(metricsRecords);
+      
+      this.logger.info('Batch metrics tracked successfully', { 
+        inserted: result.insertedCount,
+        errors: errors.length
+      });
+      
+      return {
+        success: true,
+        inserted_count: result.insertedCount,
+        error_count: errors.length,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    } else {
+      this.logger.warn('No valid metrics to track in batch');
+      
+      return {
+        success: false,
+        inserted_count: 0,
+        error_count: errors.length,
+        errors
+      };
+    }
+  }
+
+  /**
+   * Validate metrics object against rules
    * @private
    */
   _validateMetrics(metrics) {
+    if (!metrics || typeof metrics !== 'object') {
+      throw new Error('Metrics must be an object');
+    }
+    
     const validatedMetrics = {};
     
-    // Loop through provided metrics
+    // Validate each metric against defined rules
     for (const [key, value] of Object.entries(metrics)) {
-      // Check if metric is standard or custom
-      const isStandard = this.standardMetrics.includes(key);
+      // Check if metric is valid
+      if (!this.validMetrics[key]) {
+        this.logger.warn(`Ignoring unknown metric: ${key}`);
+        continue;
+      }
       
-      // For standard metrics, validate type
-      if (isStandard) {
-        if (typeof value === 'number') {
-          validatedMetrics[key] = value;
-        } else if (typeof value === 'string' && !isNaN(parseFloat(value))) {
-          // Convert numeric strings to numbers
-          validatedMetrics[key] = parseFloat(value);
-        } else {
-          this.logger.warn(`Invalid metric value for ${key}, expected number`);
+      const rules = this.validMetrics[key];
+      
+      // Type validation
+      if (rules.type === 'number' && typeof value !== 'number') {
+        throw new Error(`Metric ${key} must be a number`);
+      }
+      
+      // Range validation for numbers
+      if (rules.type === 'number') {
+        if (rules.min !== undefined && value < rules.min) {
+          throw new Error(`Metric ${key} must be at least ${rules.min}`);
         }
-      } else {
-        // Allow custom metrics with prefix
-        if (key.startsWith('custom_')) {
-          validatedMetrics[key] = value;
-        } else {
-          this.logger.warn(`Non-standard metric ${key} should use 'custom_' prefix`);
-          validatedMetrics[`custom_${key}`] = value;
+        
+        if (rules.max !== undefined && value > rules.max) {
+          throw new Error(`Metric ${key} must be at most ${rules.max}`);
         }
       }
+      
+      // Add validated metric
+      validatedMetrics[key] = value;
     }
     
     return validatedMetrics;
   }
 
   /**
-   * Update derived metrics based on tracked metrics
+   * Aggregate metrics from multiple records
    * @private
    */
-  async _updateDerivedMetrics(contentId) {
-    try {
-      // Get latest metrics
-      const latestMetrics = await this.storage.collections.performance_metrics
-        .find({ content_id: this.storage.ObjectId(contentId) })
-        .sort({ timestamp: -1 })
-        .limit(1)
-        .toArray();
+  _aggregateMetricsRecords(records) {
+    if (records.length === 0) return {};
+    
+    const aggregated = {};
+    const counts = {};
+    
+    // Cumulative metrics (sum)
+    const cumulativeMetrics = ['views', 'unique_views', 'clicks', 'social_shares', 'comments', 'likes', 'backlinks'];
+    
+    // Rate metrics (average)
+    const rateMetrics = ['engagement_rate', 'conversion_rate', 'bounce_rate', 'avg_time_on_page'];
+    
+    // Process each record
+    for (const record of records) {
+      for (const [key, value] of Object.entries(record)) {
+        // Skip non-metric fields
+        if (['_id', 'content_id', 'timestamp'].includes(key)) continue;
         
-      if (latestMetrics.length === 0) {
-        return;
-      }
-      
-      const metrics = latestMetrics[0];
-      const derivedUpdates = {};
-      
-      // Calculate engagement rate if not provided
-      if (!metrics.engagement_rate && metrics.views && 
-          (metrics.avg_time_on_page || metrics.scroll_depth || metrics.comments || metrics.likes)) {
-        // Simple engagement formula based on available metrics
-        let engagementFactors = 0;
-        let engagementSum = 0;
-        
-        if (metrics.avg_time_on_page) {
-          engagementSum += Math.min(metrics.avg_time_on_page / 120, 1); // Normalize to max of 2 minutes
-          engagementFactors++;
+        // Initialize if needed
+        if (aggregated[key] === undefined) {
+          aggregated[key] = 0;
+          counts[key] = 0;
         }
         
-        if (metrics.scroll_depth) {
-          engagementSum += metrics.scroll_depth; // Assuming 0-1 range
-          engagementFactors++;
-        }
-        
-        if (metrics.comments) {
-          engagementSum += Math.min(metrics.comments / metrics.views, 0.2); // Cap at 20%
-          engagementFactors++;
-        }
-        
-        if (metrics.likes) {
-          engagementSum += Math.min(metrics.likes / metrics.views, 0.3); // Cap at 30%
-          engagementFactors++;
-        }
-        
-        if (engagementFactors > 0) {
-          derivedUpdates.engagement_rate = engagementSum / engagementFactors;
+        // Add value
+        if (typeof value === 'number') {
+          aggregated[key] += value;
+          counts[key]++;
         }
       }
-      
-      // Calculate conversion rate if not provided
-      if (!metrics.conversion_rate && metrics.conversions && metrics.views) {
-        derivedUpdates.conversion_rate = metrics.conversions / metrics.views;
+    }
+    
+    // Post-process metrics based on their type
+    for (const metric of rateMetrics) {
+      if (aggregated[metric] !== undefined && counts[metric] > 0) {
+        // Calculate average for rate metrics
+        aggregated[metric] = aggregated[metric] / counts[metric];
       }
-      
-      // Apply updates if any
-      if (Object.keys(derivedUpdates).length > 0) {
-        await this.storage.collections.performance_metrics.updateOne(
-          { _id: metrics._id },
-          { $set: derivedUpdates }
-        );
-        
-        this.logger.info('Updated derived metrics', {
-          contentId,
-          metrics: Object.keys(derivedUpdates)
-        });
-      }
-    } catch (error) {
-      this.logger.error('Error updating derived metrics:', error);
+    }
+    
+    // For cumulative metrics like views, we may want to use the latest value instead
+    // This depends on whether the metrics are incremental or absolute
+    // Here we assume they are absolute, so we use the sum across all records
+    
+    return aggregated;
+  }
+
+  /**
+   * Get start date based on timeframe
+   * @private
+   */
+  _getStartDateForTimeframe(timeframe) {
+    const now = new Date();
+    
+    switch (timeframe.toLowerCase()) {
+      case 'day':
+        return new Date(now.setDate(now.getDate() - 1));
+      case 'week':
+        return new Date(now.setDate(now.getDate() - 7));
+      case 'month':
+        return new Date(now.setMonth(now.getMonth() - 1));
+      case 'quarter':
+        return new Date(now.setMonth(now.getMonth() - 3));
+      case 'year':
+        return new Date(now.setFullYear(now.getFullYear() - 1));
+      default:
+        return new Date(now.setDate(now.getDate() - 7)); // Default to week
     }
   }
 }
