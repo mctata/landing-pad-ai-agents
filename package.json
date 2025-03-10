@@ -13,7 +13,8 @@
     "agent:creation": "node src/cli/agent-commands.js content_creation",
     "agent:management": "node src/cli/agent-commands.js content_management",
     "agent:optimisation": "node src/cli/agent-commands.js optimisation",
-    "agent:brand": "node src/cli/agent-commands.js brand_consistency"
+    "agent:brand": "node src/cli/agent-commands.js brand_consistency",
+    "monitor": "node examples/agent-health-integration.js"
   },
   "repository": {
     "type": "git",
@@ -48,6 +49,7 @@
     "mongodb": "^6.4.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.6.9",
     "openai": "^4.29.0",
     "redis": "^4.6.13",
     "winston": "^3.12.0"
