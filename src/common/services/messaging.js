@@ -1,308 +1,276 @@
 /**
  * Messaging Service
- * Provides RabbitMQ connection and message handling
+ * Provides messaging capabilities for inter-agent communication
  */
 
-const amqp = require('amqplib');
-
 class MessagingService {
-  constructor(config, logger) {
-    this.config = config;
+  /**
+   * Create a new messaging service
+   * @param {Object} connection - RabbitMQ connection
+   * @param {Object} logger - Logger instance
+   */
+  constructor(connection, logger) {
+    this.connection = connection;
     this.logger = logger;
-    this.connection = null;
     this.channel = null;
     this.subscriptions = new Map();
-    this.isReconnecting = false;
+    this.exchangeSubscriptions = new Map();
   }
-
-  async connect() {
+  
+  /**
+   * Initialize the messaging service
+   */
+  async initialize() {
     try {
-      this.logger.info('Connecting to message broker...');
-      
-      // Build connection URL
-      const { host, port, username, password, vhost, ssl } = this.config.broker;
-      const protocol = ssl ? 'amqps' : 'amqp';
-      const connectionUrl = `${protocol}://${username}:${password}@${host}:${port}/${encodeURIComponent(vhost)}`;
-      
-      // Connect to RabbitMQ
-      this.connection = await amqp.connect(connectionUrl);
-      
       // Create channel
       this.channel = await this.connection.createChannel();
+      this.logger.info('Created RabbitMQ channel');
       
-      // Setup exchanges
-      for (const [exchangeName, exchangeConfig] of Object.entries(this.config.exchanges)) {
-        await this.channel.assertExchange(
-          exchangeName,
-          exchangeConfig.type,
-          { durable: exchangeConfig.durable }
-        );
-      }
+      // Create agent_events exchange
+      await this.channel.assertExchange('agent_events', 'topic', { durable: true });
+      this.logger.info('Created agent_events exchange');
       
-      // Setup queues
-      for (const [queueName, queueConfig] of Object.entries(this.config.queues)) {
-        await this.channel.assertQueue(queueName, { durable: queueConfig.durable });
-        
-        // Bind queue to exchange if binding is specified
-        if (queueConfig.binding) {
-          await this.channel.bindQueue(
-            queueName,
-            queueConfig.binding.exchange,
-            queueConfig.binding.routing_key || ''
-          );
-        }
-        
-        // Set prefetch if specified
-        if (queueConfig.prefetch) {
-          await this.channel.prefetch(queueConfig.prefetch);
-        }
-      }
-      
-      // Setup error handlers
-      this.connection.on('error', (err) => {
-        this.logger.error('RabbitMQ connection error:', err);
-        this._reconnect();
-      });
-      
-      this.connection.on('close', () => {
-        this.logger.warn('RabbitMQ connection closed');
-        this._reconnect();
-      });
-      
-      this.logger.info('Message broker connection established');
-      return true;
+      this.logger.info('Messaging service initialized successfully');
     } catch (error) {
-      this.logger.error('Failed to connect to message broker:', error);
+      this.logger.error('Error initializing messaging service:', error);
       throw error;
     }
   }
-
-  async _reconnect() {
-    try {
-      // Only attempt reconnect if we're not already connecting
-      if (this.connection === null && this.isReconnecting !== true) {
-        this.isReconnecting = true;
-        this.logger.info('Attempting to reconnect to message broker...');
-        
-        // Wait before reconnecting
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        // Connect and restore subscriptions
-        await this.connect();
-        
-        // Resubscribe to all previous subscriptions
-        const subscriptions = [...this.subscriptions.entries()];
-        this.subscriptions.clear();
-        
-        for (const [key, { queue, exchange, pattern, callback }] of subscriptions) {
-          if (queue) {
-            await this.subscribe(queue, callback);
-          } else if (exchange && pattern) {
-            await this.subscribeToExchange(exchange, pattern, callback);
-          }
-        }
-        
-        this.isReconnecting = false;
-        this.logger.info('Successfully reconnected to message broker');
-      }
-    } catch (error) {
-      this.isReconnecting = false;
-      this.logger.error('Failed to reconnect to message broker:', error);
-      
-      // Try again after a delay
-      setTimeout(() => this._reconnect(), 10000);
-    }
+  
+  /**
+   * Check if the connection is active
+   * @returns {boolean} True if connected
+   */
+  isConnected() {
+    return this.connection && this.channel;
   }
-
-  async disconnect() {
-    if (this.channel) {
-      try {
-        await this.channel.close();
-        this.channel = null;
-      } catch (error) {
-        this.logger.error('Error closing channel:', error);
-      }
-    }
-    
-    if (this.connection) {
-      try {
-        await this.connection.close();
-        this.connection = null;
-      } catch (error) {
-        this.logger.error('Error closing connection:', error);
-      }
-    }
-    
-    this.subscriptions.clear();
-    this.logger.info('Message broker connection closed');
-  }
-
-  async publish(exchange, routingKey, message) {
-    if (!this.channel) {
-      throw new Error('Not connected to message broker');
-    }
-    
+  
+  /**
+   * Subscribe to a queue
+   * @param {string} queueName - Name of the queue to subscribe to
+   * @param {Function} handler - Message handler function
+   */
+  async subscribe(queueName, handler) {
     try {
-      const messageBuffer = Buffer.from(JSON.stringify(message));
+      // Assert queue exists
+      await this.channel.assertQueue(queueName, { durable: true });
       
-      await this.channel.publish(
-        exchange,
-        routingKey,
-        messageBuffer,
-        {
-          contentType: 'application/json',
-          messageId: message.id,
-          correlationId: message.correlation_id || undefined,
-          timestamp: Math.floor(Date.now() / 1000)
-        }
-      );
-      
-      this.logger.debug('Published message', {
-        exchange,
-        routingKey,
-        messageId: message.id
-      });
-      
-      return true;
-    } catch (error) {
-      this.logger.error('Failed to publish message:', error);
-      throw error;
-    }
-  }
-
-  async subscribe(queue, callback) {
-    if (!this.channel) {
-      throw new Error('Not connected to message broker');
-    }
-    
-    if (this.subscriptions.has(queue)) {
-      this.logger.warn(`Already subscribed to queue: ${queue}`);
-      return;
-    }
-    
-    try {
-      const { consumerTag } = await this.channel.consume(queue, async (msg) => {
-        if (msg === null) {
-          this.logger.warn(`Consumer for queue ${queue} cancelled by broker`);
-          return;
-        }
+      // Set up consumer
+      const { consumerTag } = await this.channel.consume(queueName, async (msg) => {
+        if (!msg) return;
         
         try {
-          // Parse message content
+          // Parse message
           const content = JSON.parse(msg.content.toString());
           
-          this.logger.debug('Received message', {
-            queue,
-            messageId: content.id
-          });
-          
-          // Process message
-          await callback(content);
+          // Call handler with message
+          await handler(content);
           
           // Acknowledge message
           this.channel.ack(msg);
         } catch (error) {
-          this.logger.error('Error processing message:', error);
+          this.logger.error(`Error processing message from queue ${queueName}:`, error);
           
-          // Reject message and requeue if configured
-          const requeue = this.config.retry && this.config.retry.max_attempts > 0;
-          this.channel.nack(msg, false, requeue);
+          // Acknowledge message to prevent requeuing (could use dead letter queue instead)
+          this.channel.ack(msg);
         }
       });
       
-      this.subscriptions.set(queue, { queue, callback, consumerTag });
+      // Store subscription for cleanup
+      this.subscriptions.set(queueName, consumerTag);
       
-      this.logger.info(`Subscribed to queue: ${queue}`);
-      return consumerTag;
+      this.logger.info(`Subscribed to queue: ${queueName}`);
     } catch (error) {
-      this.logger.error(`Failed to subscribe to queue ${queue}:`, error);
+      this.logger.error(`Error subscribing to queue ${queueName}:`, error);
       throw error;
     }
   }
-
-  async subscribeToExchange(exchange, pattern, callback) {
-    if (!this.channel) {
-      throw new Error('Not connected to message broker');
-    }
-    
-    const subscriptionKey = `${exchange}:${pattern}`;
-    
-    if (this.subscriptions.has(subscriptionKey)) {
-      this.logger.warn(`Already subscribed to ${exchange} with pattern ${pattern}`);
-      return;
-    }
-    
+  
+  /**
+   * Subscribe to an exchange
+   * @param {string} exchangeName - Name of the exchange to subscribe to
+   * @param {string} routingKey - Routing key to subscribe to
+   * @param {Function} handler - Message handler function
+   */
+  async subscribeToExchange(exchangeName, routingKey, handler) {
     try {
-      // Create an exclusive queue for this subscription
+      // Assert exchange exists
+      await this.channel.assertExchange(exchangeName, 'topic', { durable: true });
+      
+      // Create unique queue for this subscription
       const { queue } = await this.channel.assertQueue('', { exclusive: true });
       
-      // Bind the queue to the exchange with the pattern
-      await this.channel.bindQueue(queue, exchange, pattern);
+      // Bind queue to exchange with routing key
+      await this.channel.bindQueue(queue, exchangeName, routingKey);
       
-      // Subscribe to the queue
+      // Set up consumer
       const { consumerTag } = await this.channel.consume(queue, async (msg) => {
-        if (msg === null) {
-          this.logger.warn(`Consumer for exchange ${exchange} cancelled by broker`);
-          return;
-        }
+        if (!msg) return;
         
         try {
-          // Parse message content
+          // Parse message
           const content = JSON.parse(msg.content.toString());
           
-          this.logger.debug('Received message from exchange', {
-            exchange,
-            pattern,
-            messageId: content.id
-          });
-          
-          // Process message
-          await callback(content, msg.fields.routingKey);
+          // Call handler with message
+          await handler(content);
           
           // Acknowledge message
           this.channel.ack(msg);
         } catch (error) {
-          this.logger.error('Error processing message from exchange:', error);
+          this.logger.error(`Error processing message from exchange ${exchangeName} (${routingKey}):`, error);
           
-          // Reject message but don't requeue since it's a pub/sub pattern
-          this.channel.nack(msg, false, false);
+          // Acknowledge message to prevent requeuing
+          this.channel.ack(msg);
         }
       });
       
-      this.subscriptions.set(subscriptionKey, { 
-        exchange, 
-        pattern, 
-        queue, 
-        callback, 
-        consumerTag 
-      });
+      // Store subscription details for cleanup
+      const subscriptionKey = `${exchangeName}:${routingKey}`;
+      this.exchangeSubscriptions.set(subscriptionKey, { queue, consumerTag });
       
-      this.logger.info(`Subscribed to exchange: ${exchange} with pattern: ${pattern}`);
-      return consumerTag;
+      this.logger.info(`Subscribed to exchange: ${exchangeName} with routing key: ${routingKey}`);
+      
+      return subscriptionKey;
     } catch (error) {
-      this.logger.error(`Failed to subscribe to exchange ${exchange}:`, error);
+      this.logger.error(`Error subscribing to exchange ${exchangeName} with routing key ${routingKey}:`, error);
       throw error;
     }
   }
-
-  async unsubscribe(queueOrKey) {
-    if (!this.channel) {
-      throw new Error('Not connected to message broker');
-    }
-    
-    if (!this.subscriptions.has(queueOrKey)) {
-      this.logger.warn(`Not subscribed to: ${queueOrKey}`);
-      return;
-    }
-    
-    const subscription = this.subscriptions.get(queueOrKey);
-    
+  
+  /**
+   * Publish a message to a queue
+   * @param {string} queueName - Name of the queue to publish to
+   * @param {Object} message - Message to publish
+   */
+  async publish(queueName, message) {
     try {
-      await this.channel.cancel(subscription.consumerTag);
-      this.subscriptions.delete(queueOrKey);
-      this.logger.info(`Unsubscribed from: ${queueOrKey}`);
+      // Assert queue exists
+      await this.channel.assertQueue(queueName, { durable: true });
+      
+      // Publish message
+      const result = this.channel.sendToQueue(
+        queueName, 
+        Buffer.from(JSON.stringify(message)),
+        { persistent: true }
+      );
+      
+      if (!result) {
+        this.logger.warn(`Queue ${queueName} is full or connection is blocked`);
+      }
+      
+      this.logger.debug(`Published message to queue: ${queueName}`);
+      
+      return result;
     } catch (error) {
-      this.logger.error(`Failed to unsubscribe from ${queueOrKey}:`, error);
+      this.logger.error(`Error publishing to queue ${queueName}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Publish a message to an exchange
+   * @param {string} exchangeName - Name of the exchange to publish to
+   * @param {string} routingKey - Routing key for the message
+   * @param {Object} message - Message to publish
+   */
+  async publish(exchangeName, routingKey, message) {
+    try {
+      // Assert exchange exists
+      await this.channel.assertExchange(exchangeName, 'topic', { durable: true });
+      
+      // Publish message
+      const result = this.channel.publish(
+        exchangeName,
+        routingKey,
+        Buffer.from(JSON.stringify(message)),
+        { persistent: true }
+      );
+      
+      if (!result) {
+        this.logger.warn(`Exchange ${exchangeName} is full or connection is blocked`);
+      }
+      
+      this.logger.debug(`Published message to exchange: ${exchangeName} with routing key: ${routingKey}`);
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`Error publishing to exchange ${exchangeName} with routing key ${routingKey}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Unsubscribe from a queue
+   * @param {string} queueName - Name of the queue to unsubscribe from
+   */
+  async unsubscribe(queueName) {
+    try {
+      const consumerTag = this.subscriptions.get(queueName);
+      
+      if (consumerTag) {
+        await this.channel.cancel(consumerTag);
+        this.subscriptions.delete(queueName);
+        this.logger.info(`Unsubscribed from queue: ${queueName}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error unsubscribing from queue ${queueName}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Unsubscribe from an exchange
+   * @param {string} subscriptionKey - Subscription key returned from subscribeToExchange
+   */
+  async unsubscribeFromExchange(subscriptionKey) {
+    try {
+      const subscription = this.exchangeSubscriptions.get(subscriptionKey);
+      
+      if (subscription) {
+        await this.channel.cancel(subscription.consumerTag);
+        this.exchangeSubscriptions.delete(subscriptionKey);
+        this.logger.info(`Unsubscribed from exchange with key: ${subscriptionKey}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error unsubscribing from exchange with key ${subscriptionKey}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Close the messaging service
+   */
+  async close() {
+    try {
+      // Cancel all subscriptions
+      for (const [queueName, consumerTag] of this.subscriptions.entries()) {
+        try {
+          await this.channel.cancel(consumerTag);
+          this.logger.info(`Cancelled subscription to queue: ${queueName}`);
+        } catch (error) {
+          this.logger.warn(`Error cancelling subscription to queue ${queueName}:`, error);
+        }
+      }
+      
+      // Cancel all exchange subscriptions
+      for (const [key, subscription] of this.exchangeSubscriptions.entries()) {
+        try {
+          await this.channel.cancel(subscription.consumerTag);
+          this.logger.info(`Cancelled subscription to exchange with key: ${key}`);
+        } catch (error) {
+          this.logger.warn(`Error cancelling subscription to exchange with key ${key}:`, error);
+        }
+      }
+      
+      // Close channel
+      if (this.channel) {
+        await this.channel.close();
+        this.logger.info('Closed RabbitMQ channel');
+      }
+      
+      this.logger.info('Messaging service closed');
+    } catch (error) {
+      this.logger.error('Error closing messaging service:', error);
       throw error;
     }
   }
