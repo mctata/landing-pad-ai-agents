@@ -56,12 +56,20 @@ For detailed information on:
 
 ## Example Outputs
 
-See the `/examples` directory for sample outputs including:
-- Blog posts
-- Social media updates
-- Landing page copy
-- Content calendars
-- Performance reports
+See the `/examples/daily_outputs` directory for sample outputs including:
+- [Blog posts](examples/daily_outputs/blog_post.md)
+- [Social media updates](examples/daily_outputs/social_media_package.md)
+- [Landing page copy](examples/daily_outputs/landing_page.md)
+- [Content calendars](examples/daily_outputs/content_calendar.md)
+- [Performance reports](examples/daily_outputs/optimisation_report.md)
+
+## Core Services
+
+The system is built around several core services that provide shared functionality:
+
+- **Messaging Service**: Handles communication between agents via RabbitMQ
+- **Storage Service**: Provides database access via MongoDB
+- **AI Provider Service**: Manages interaction with AI models from Anthropic and OpenAI
 
 ## Technology Stack
 
@@ -79,7 +87,7 @@ See the `/examples` directory for sample outputs including:
 4. Run the database initialization script: `npm run db:init`
 5. Start the system with `npm start` or in development mode with `npm run dev`
 
-See the [Getting Started Guide](getting_started.md) for detailed instructions.
+See the [Getting Started Guide](getting_started.md) for detailed instructions, including how to install all prerequisites.
 
 ## Running Individual Agents
 
@@ -92,6 +100,27 @@ npm run agent:management  # Run Content Management Agent
 npm run agent:optimisation # Run Optimisation Agent
 npm run agent:brand       # Run Brand Consistency Agent
 ```
+
+## System Status and Health Checks
+
+The system includes health check endpoints to verify operation:
+
+- `GET /api/health`: Basic health check
+- `GET /api/status`: Detailed system status (requires authentication)
+
+## Recent Updates and Bug Fixes
+
+- Added complete implementations for all five agent types
+- Added BaseModule class to support agent module inheritance
+- Implemented messaging service for inter-agent communication
+- Added storage service with MongoDB integration
+- Created AI provider service supporting both Anthropic and OpenAI models
+- Included detailed example outputs for all content types
+- Added system entry point with proper initialization and shutdown
+- Fixed error handling in agent modules
+- Enhanced API authentication and validation
+- Added comprehensive documentation
+- Expanded getting started guide with prerequisite installation
 
 ## License
 
