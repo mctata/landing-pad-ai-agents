@@ -104,247 +104,294 @@ class AbTestingGenerator extends BaseModule {
       return [];
     }
     
+    this.logger.debug(`Generating variations for ${element}`, { originalValue });
+    
     // Define prompt based on element type
-    let prompt = this._getPromptForElement(element, originalValue, contentItem);
+    const promptForElement = this._getPromptForElement(element, contentItem, originalValue);
     
     // Generate variations using AI
-    const variations = await this._generateVariationsWithAI(prompt, element, contentItem.type);
-    
-    // Add original value as reference
-    variations.unshift({
-      text: originalValue,
-      is_original: true,
-      rationale: 'Original content'
-    });
+    let variations = [];
+    try {
+      const result = await this.aiProvider.generateText({
+        messages: [
+          {
+            role: 'system',
+            content: promptForElement.system
+          },
+          {
+            role: 'user',
+            content: promptForElement.user
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 1000
+      });
+      
+      // Parse AI-generated variations
+      variations = this._parseVariations(result, element);
+      
+      // Ensure we have unique variations
+      variations = variations
+        .filter(v => v.text && v.text !== originalValue)
+        .filter((v, i, self) => self.findIndex(s => s.text === v.text) === i);
+      
+      // Add hypothesis to each variation
+      variations = variations.map(v => ({
+        ...v,
+        hypothesis: this._generateHypothesis(element, originalValue, v.text)
+      }));
+      
+      // Limit to reasonable number
+      const maxVariations = Math.min(variations.length, 3);
+      variations = variations.slice(0, maxVariations);
+      
+      // Add original as first variation for reference
+      variations.unshift({
+        text: originalValue,
+        is_original: true,
+        rationale: 'Original content',
+        hypothesis: null
+      });
+      
+    } catch (error) {
+      this.logger.error(`Error generating variations with AI for ${element}:`, error);
+      return [{ 
+        text: originalValue, 
+        is_original: true, 
+        rationale: 'Original content',
+        hypothesis: null
+      }];
+    }
     
     return variations;
   }
 
   /**
-   * Get element value from content item
+   * Get value of a specific element from content
    * @private
    */
   _getElementValue(contentItem, element) {
-    // Map common element names to potential content item properties
-    const elementMappings = {
-      'headline': ['headline', 'title', 'heading'],
-      'cta': ['cta', 'call_to_action', 'button_text'],
-      'hero_image': ['hero_image', 'main_image', 'featured_image'],
-      'subheading': ['subheading', 'subtitle', 'secondary_heading'],
-      'description': ['description', 'excerpt', 'summary'],
-      'intro': ['intro', 'introduction', 'lead'],
-      'outro': ['outro', 'conclusion']
-    };
-    
-    // Look for the element in the content item
-    if (element in contentItem) {
-      return contentItem[element];
-    }
-    
-    // Try alternative property names
-    if (element in elementMappings) {
-      for (const alt of elementMappings[element]) {
-        if (alt in contentItem) {
-          return contentItem[alt];
-        }
-      }
-    }
-    
-    // Check for nested elements
-    if (contentItem.elements && element in contentItem.elements) {
-      return contentItem.elements[element];
-    }
-    
-    // Check for content object
-    if (contentItem.content) {
-      if (typeof contentItem.content === 'string') {
-        // If content is a string, see if we can extract the element
-        return this._extractElementFromContent(contentItem.content, element);
-      } else if (typeof contentItem.content === 'object' && element in contentItem.content) {
-        return contentItem.content[element];
-      }
-    }
-    
-    return null;
-  }
-
-  /**
-   * Extract element from content string
-   * @private
-   */
-  _extractElementFromContent(content, element) {
-    // Simple extraction based on common patterns
-    switch (element) {
+    switch (element.toLowerCase()) {
       case 'headline':
       case 'title':
-        // Try to extract title from markdown or HTML
-        const titleMatch = content.match(/^#\s+(.+)$/m) || content.match(/<h1[^>]*>(.+?)<\/h1>/);
-        return titleMatch ? titleMatch[1] : null;
+        return contentItem.title || contentItem.headline;
         
-      case 'subheading':
+      case 'cta':
+      case 'call_to_action':
+        return contentItem.cta || 
+               contentItem.call_to_action || 
+               (contentItem.elements && contentItem.elements.cta);
+        
+      case 'subheadline':
       case 'subtitle':
-        const subtitleMatch = content.match(/^##\s+(.+)$/m) || content.match(/<h2[^>]*>(.+?)<\/h2>/);
-        return subtitleMatch ? subtitleMatch[1] : null;
-        
-      case 'cta':
-      case 'call_to_action':
-        const ctaMatch = content.match(/\[([^\]]+)\]\([^)]+\)/g) || 
-                         content.match(/<a[^>]*>(.+?)<\/a>/g) ||
-                         content.match(/<button[^>]*>(.+?)<\/button>/g);
-        return ctaMatch ? ctaMatch[0] : null;
-        
-      default:
-        return null;
-    }
-  }
-
-  /**
-   * Get appropriate prompt for element
-   * @private
-   */
-  _getPromptForElement(element, originalValue, contentItem) {
-    const contentType = contentItem.type || 'content';
-    const targetAudience = contentItem.target_audience || 'general audience';
-    
-    // Base prompt with context
-    let prompt = `Generate 3 alternative versions for the ${element} of this ${contentType}. The target audience is ${targetAudience}. The original ${element} is: "${originalValue}"\n\n`;
-    
-    // Add element-specific guidance
-    switch (element) {
-      case 'headline':
-      case 'title':
-        prompt += `For each alternative, focus on clarity, impact, and audience appeal. Each headline should highlight Landing Pad Digital's AI website builder capabilities. Make each headline distinct in approach (e.g., benefit-focused, question-based, curiosity-driven) but maintain professional tone.`;
-        break;
-        
-      case 'cta':
-      case 'call_to_action':
-        prompt += `Create compelling call-to-action alternatives that drive conversions. Focus on action verbs, urgency, and value proposition. Keep CTAs concise but impactful. Each CTA should relate to Landing Pad Digital's website building platform.`;
-        break;
+        return contentItem.subheadline || 
+               contentItem.subtitle || 
+               contentItem.description;
         
       case 'hero_image':
-        prompt += `Suggest 3 alternative concepts for the hero image that would resonate with the target audience. Describe the image clearly, including subject, mood, style, and key elements. Each concept should visually represent Landing Pad Digital's AI website builder platform.`;
-        break;
+      case 'image':
+        if (contentItem.hero_image) return contentItem.hero_image;
+        if (contentItem.images && contentItem.images.length > 0) return contentItem.images[0];
+        if (contentItem.elements && contentItem.elements.hero_image) return contentItem.elements.hero_image;
+        return null;
         
-      case 'subheading':
-      case 'subtitle':
-        prompt += `Create subheading alternatives that support the main headline and elaborate on the value proposition. Focus on clarity and benefits. Each subheading should add information while maintaining brand voice.`;
-        break;
-        
-      case 'description':
-      case 'summary':
-        prompt += `Generate concise description alternatives that clearly communicate the core message. Focus on benefits, outcomes, and unique value. Keep the same approximate length as the original.`;
-        break;
+      case 'intro':
+      case 'introduction':
+        if (contentItem.intro) return contentItem.intro;
+        if (contentItem.introduction) return contentItem.introduction;
+        if (contentItem.content && typeof contentItem.content === 'string') {
+          // Extract first paragraph
+          const firstParagraph = contentItem.content.split('\n\n')[0];
+          if (firstParagraph.length < 500) return firstParagraph;
+        }
+        return null;
         
       default:
-        prompt += `Create 3 alternatives that maintain the core message while introducing variations in tone, structure, or emphasis. Ensure each alternative aligns with Landing Pad Digital's brand voice and highlights the AI website builder platform.`;
+        // Check for custom elements
+        if (contentItem.elements && contentItem.elements[element]) {
+          return contentItem.elements[element];
+        }
+        return contentItem[element];
     }
-    
-    // Add formatting instructions
-    prompt += `\n\nFor each alternative, include a brief rationale explaining why this version might perform better. Format each alternative as:\nAlternative X: [TEXT]\nRationale: [WHY THIS MIGHT PERFORM BETTER]`;
-    
-    return prompt;
   }
 
   /**
-   * Generate variations using AI
+   * Generate prompt for specific element
    * @private
    */
-  async _generateVariationsWithAI(prompt, element, contentType) {
+  _getPromptForElement(element, contentItem, originalValue) {
+    const contentType = contentItem.type || 'content';
+    const contentPurpose = contentItem.purpose || 'To educate users about Landing Pad Digital\'s AI website builder';
+    
+    const baseSystemPrompt = 
+      `You are an expert copywriter specializing in conversion optimization and A/B testing for digital content. Your task is to generate 3 alternative versions of a ${element} for a ${contentType}.
+
+The content is about Landing Pad Digital's AI-powered website builder platform. Alternatives should maintain the same core message but use different approaches to potentially improve conversion rates.
+
+For each alternative, provide:
+1. The alternative text
+2. A brief rationale for why this version might perform better
+
+Format each alternative as:
+---
+ALTERNATIVE: [alternative text]
+RATIONALE: [brief explanation of why this might perform better]
+---`;
+
+    const userPrompts = {
+      headline: `Generate 3 alternative headlines for this ${contentType} about Landing Pad Digital's AI website builder. 
+      
+Original headline: "${originalValue}"
+
+Content purpose: ${contentPurpose}
+
+The alternatives should:
+- Be concise and compelling
+- Clearly communicate the value proposition
+- Use action words where appropriate
+- Highlight the AI-powered features
+- Maintain the same core message but test different angles or emotional appeals`,
+
+      cta: `Generate 3 alternative call-to-action (CTA) texts for this ${contentType} about Landing Pad Digital's AI website builder.
+      
+Original CTA: "${originalValue}"
+
+Content purpose: ${contentPurpose}
+
+The alternatives should:
+- Be action-oriented and clear
+- Create a sense of urgency or value
+- Be concise (typically 2-5 words)
+- Eliminate friction or hesitation
+- Test different value propositions or benefits`,
+
+      subheadline: `Generate 3 alternative subheadlines for this ${contentType} about Landing Pad Digital's AI website builder.
+      
+Original subheadline: "${originalValue}"
+
+Main headline: "${contentItem.title || contentItem.headline || 'Unknown'}"
+
+Content purpose: ${contentPurpose}
+
+The alternatives should:
+- Expand on the headline's promise
+- Provide more specific benefits or features
+- Support the main headline
+- Be concise but descriptive
+- Address potential customer pain points`,
+
+      intro: `Generate 3 alternative introductions for this ${contentType} about Landing Pad Digital's AI website builder.
+      
+Original introduction: "${originalValue}"
+
+Content purpose: ${contentPurpose}
+
+The alternatives should:
+- Hook the reader immediately
+- Clearly state the problem being solved
+- Hint at the solution (Landing Pad Digital's AI website builder)
+- Be concise yet informative
+- Use different approaches (question, statistic, story, etc.)`
+    };
+    
+    // Default prompt if not specifically defined
+    const defaultUserPrompt = `Generate 3 alternatives for this ${element} in a ${contentType} about Landing Pad Digital's AI website builder.
+    
+Original ${element}: "${originalValue}"
+
+Content purpose: ${contentPurpose}
+
+The alternatives should:
+- Maintain the same core message
+- Test different approaches or wording
+- Be optimized for better conversion
+- Highlight Landing Pad Digital's AI website builder features and benefits`;
+    
+    return {
+      system: baseSystemPrompt,
+      user: userPrompts[element.toLowerCase()] || defaultUserPrompt
+    };
+  }
+
+  /**
+   * Parse AI-generated variations
+   * @private
+   */
+  _parseVariations(aiResponse, element) {
     try {
-      const response = await this.aiProvider.generateText({
-        provider: 'anthropic',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert A/B testing specialist for Landing Pad Digital, a company offering an AI-powered website builder. Generate creative, effective variations for content elements that would drive better performance.`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1500
-      });
+      const variations = [];
       
-      // Parse the response into structured variations
-      return this._parseVariationsFromResponse(response, element);
+      // Split by alternative sections
+      const alternativeSections = aiResponse.split('---').filter(section => section.trim() !== '');
+      
+      for (const section of alternativeSections) {
+        const alternativeMatch = section.match(/ALTERNATIVE:?\s*(.*?)(?=RATIONALE:|$)/is);
+        const rationaleMatch = section.match(/RATIONALE:?\s*(.*?)(?=---|$)/is);
+        
+        if (alternativeMatch) {
+          const text = alternativeMatch[1].trim();
+          const rationale = rationaleMatch ? rationaleMatch[1].trim() : 'No rationale provided';
+          
+          variations.push({
+            text,
+            is_original: false,
+            rationale
+          });
+        }
+      }
+      
+      // If parsing failed, try simpler parsing
+      if (variations.length === 0) {
+        // Look for numbered alternatives (1., 2., 3., etc.)
+        const numberedAlternatives = aiResponse.match(/\d+\.\s*(.*?)(?=\d+\.|$)/gs);
+        
+        if (numberedAlternatives) {
+          for (const alternative of numberedAlternatives) {
+            const text = alternative.replace(/^\d+\.\s*/, '').trim();
+            if (text) {
+              variations.push({
+                text,
+                is_original: false,
+                rationale: 'Alternative version'
+              });
+            }
+          }
+        }
+      }
+      
+      return variations;
     } catch (error) {
-      this.logger.error('Error generating variations with AI:', error);
-      return []; // Return empty array on error
+      this.logger.error(`Error parsing AI response for ${element}:`, error);
+      return [];
     }
   }
 
   /**
-   * Parse variations from AI response
+   * Generate hypothesis for A/B test
    * @private
    */
-  _parseVariationsFromResponse(response, element) {
-    // Define regex patterns for different response formats
-    const alternativePatterns = [
-      // Pattern: Alternative X: [text] \n Rationale: [rationale]
-      /Alternative\s+\d+:(?:\s+)?(.+?)(?:\n|\r\n)Rationale:(?:\s+)?(.+?)(?:\n\n|\r\n\r\n|$)/gis,
-      
-      // Pattern: X. [text] \n Rationale: [rationale]
-      /\d+\.(?:\s+)?(.+?)(?:\n|\r\n)Rationale:(?:\s+)?(.+?)(?:\n\n|\r\n\r\n|$)/gis,
-      
-      // Pattern: X: [text] \n Rationale: [rationale]
-      /\d+:(?:\s+)?(.+?)(?:\n|\r\n)Rationale:(?:\s+)?(.+?)(?:\n\n|\r\n\r\n|$)/gis,
-      
-      // Pattern: X: [text] \n Reason: [rationale]
-      /\d+:(?:\s+)?(.+?)(?:\n|\r\n)Reason:(?:\s+)?(.+?)(?:\n\n|\r\n\r\n|$)/gis
-    ];
+  _generateHypothesis(element, original, variation) {
+    // Generic hypotheses based on element type
+    const hypotheses = {
+      headline: `Changing the headline from "${this._truncate(original)}" to "${this._truncate(variation)}" will increase CTR by testing a different value proposition.`,
+      title: `Changing the title from "${this._truncate(original)}" to "${this._truncate(variation)}" will increase engagement by using more compelling language.`,
+      cta: `Changing the CTA from "${original}" to "${variation}" will increase conversion rate by creating more urgency/clarity.`,
+      subheadline: `Changing the subheadline will improve understanding of the value proposition and increase time on page.`,
+      intro: `A different introduction approach will reduce bounce rate and increase reader engagement with the rest of the content.`
+    };
     
-    // Try each pattern
-    for (const pattern of alternativePatterns) {
-      const matches = [...response.matchAll(pattern)];
-      
-      if (matches.length > 0) {
-        return matches.map((match, index) => ({
-          text: match[1].trim(),
-          rationale: match[2].trim(),
-          is_original: false,
-          element_type: element,
-          variation_number: index + 1
-        }));
-      }
-    }
-    
-    // Fallback: try to extract any numbered alternatives
-    const fallbackPattern = /(\d+[\.:]\s+.+?)(?=\n\d+[\.:]\s+|\n\n|$)/gs;
-    const fallbackMatches = [...response.matchAll(fallbackPattern)];
-    
-    if (fallbackMatches.length > 0) {
-      return fallbackMatches.map((match, index) => ({
-        text: match[1].replace(/^\d+[\.:]\s+/, '').trim(),
-        rationale: "Generated alternative",
-        is_original: false,
-        element_type: element,
-        variation_number: index + 1
-      }));
-    }
-    
-    // If no structured format found, split by double newlines
-    const lines = response.split(/\n\n+/).filter(line => line.trim().length > 0);
-    
-    if (lines.length > 0) {
-      return lines.map((line, index) => ({
-        text: line.trim(),
-        rationale: "Generated alternative",
-        is_original: false,
-        element_type: element,
-        variation_number: index + 1
-      }));
-    }
-    
-    // Last resort: just return the whole response as one variation
-    return [{
-      text: response.trim(),
-      rationale: "Generated alternative",
-      is_original: false,
-      element_type: element,
-      variation_number: 1
-    }];
+    return hypotheses[element.toLowerCase()] || 
+      `Changing the ${element} will improve user engagement and conversion metrics.`;
+  }
+
+  /**
+   * Truncate text for display
+   * @private
+   */
+  _truncate(text, length = 40) {
+    if (!text) return '';
+    if (text.length <= length) return text;
+    return text.substring(0, length - 3) + '...';
   }
 }
 
