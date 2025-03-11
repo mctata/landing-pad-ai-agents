@@ -11,6 +11,7 @@ const agentController = require('./controllers/agentController');
 const contentController = require('./controllers/contentController');
 const analyticsController = require('./controllers/analyticsController');
 const systemController = require('./controllers/systemController');
+const integrationController = require('./controllers/integrationController');
 
 // Middleware
 const auth = require('./middleware/auth');
@@ -183,6 +184,55 @@ router.get('/analytics/audience',
 router.get('/analytics/dashboard', 
   auth.authenticate, 
   analyticsController.getDashboardData
+);
+
+// Integration routes
+router.get('/integrations/status',
+  auth.authenticate,
+  integrationController.getIntegrationStatus
+);
+
+// CMS integrations
+router.post('/integrations/cms/:platform/publish',
+  auth.authenticate,
+  integrationController.publishToCms
+);
+
+router.put('/integrations/cms/:platform/:externalId',
+  auth.authenticate,
+  integrationController.updateOnCms
+);
+
+router.post('/integrations/cms/:platform/import',
+  auth.authenticate,
+  integrationController.importFromCms
+);
+
+// Social media integrations
+router.post('/integrations/social/:platform/post',
+  auth.authenticate,
+  integrationController.postToSocial
+);
+
+router.get('/integrations/social/:platform/:externalId/metrics',
+  auth.authenticate,
+  integrationController.getSocialMetrics
+);
+
+// Analytics integrations
+router.get('/integrations/analytics/page/:pageUrl',
+  auth.authenticate,
+  integrationController.getPageAnalytics
+);
+
+router.get('/integrations/analytics/top-content',
+  auth.authenticate,
+  integrationController.getTopPerformingContent
+);
+
+router.get('/integrations/analytics/site-metrics',
+  auth.authenticate,
+  integrationController.getSiteMetrics
 );
 
 // Export the router

@@ -9,6 +9,13 @@ const ConfigService = require('./ConfigService');
 const MessagingService = require('./MessagingService');
 const StorageService = require('./StorageService');
 const AIProviderService = require('./AIProviderService');
+const IntegrationService = require('./IntegrationService');
+
+// Create integration service instance
+const integrationServiceInstance = new IntegrationService(
+  ConfigService, 
+  LoggerService.logger
+);
 
 /**
  * Initialize all services
@@ -29,6 +36,13 @@ async function initializeServices() {
       LoggerService.logger.warn(`AIProviderService not initialized: ${error.message}`);
     }
     
+    // Initialize integration service
+    try {
+      await integrationServiceInstance.initialize();
+    } catch (error) {
+      LoggerService.logger.warn(`IntegrationService not initialized: ${error.message}`);
+    }
+    
     LoggerService.logger.info('All services initialized');
     return true;
   } catch (error) {
@@ -43,6 +57,7 @@ async function initializeServices() {
 async function shutdownServices() {
   try {
     LoggerService.logger.info('Shutting down services');
+    await integrationServiceInstance.shutdown();
     await MessagingService.shutdown();
     await StorageService.shutdown();
     LoggerService.logger.info('All services shut down');
@@ -61,6 +76,7 @@ module.exports = {
   messaging: MessagingService,
   storage: StorageService,
   ai: AIProviderService,
+  integration: integrationServiceInstance,
   initialize: initializeServices,
   shutdown: shutdownServices
 };
