@@ -1,76 +1,141 @@
 {
-  "ai_providers": {
-    "openai": {
-      "api_key": "${OPENAI_API_KEY}",
-      "organization_id": "${OPENAI_ORG_ID}",
-      "default_model": "gpt-4-turbo",
-      "timeout_ms": 30000,
-      "max_retries": 3
-    },
-    "anthropic": {
-      "api_key": "${ANTHROPIC_API_KEY}",
-      "default_model": "claude-3-opus-20240229",
-      "timeout_ms": 60000,
-      "max_retries": 3
-    }
-  },
-  "cms": {
-    "wordpress": {
-      "api_url": "${WORDPRESS_API_URL}",
-      "username": "${WORDPRESS_USERNAME}",
-      "password": "${WORDPRESS_PASSWORD}",
-      "categories": {
-        "tutorials": 5,
-        "case_studies": 8,
-        "product_updates": 12,
-        "industry_insights": 15
+  "ai": {
+    "providers": {
+      "anthropic": {
+        "enabled": true,
+        "apiKey": "${ANTHROPIC_API_KEY}",
+        "models": {
+          "default": "claude-3-opus-20240229",
+          "fast": "claude-3-haiku-20240307",
+          "balanced": "claude-3-sonnet-20240229"
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 4000,
+          "topP": 0.95,
+          "timeout": 60000,
+          "retryStrategy": {
+            "attempts": 3,
+            "initialDelay": 1000,
+            "maxDelay": 10000,
+            "factor": 2
+          }
+        }
+      },
+      "openai": {
+        "enabled": true,
+        "apiKey": "${OPENAI_API_KEY}",
+        "models": {
+          "default": "gpt-4-turbo",
+          "fast": "gpt-3.5-turbo",
+          "embeddings": "text-embedding-ada-002"
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 4000,
+          "topP": 0.95,
+          "timeout": 60000,
+          "retryStrategy": {
+            "attempts": 3,
+            "initialDelay": 1000,
+            "maxDelay": 10000,
+            "factor": 2
+          }
+        }
       }
-    }
-  },
-  "social_media": {
-    "twitter": {
-      "api_key": "${TWITTER_API_KEY}",
-      "api_secret": "${TWITTER_API_SECRET}",
-      "access_token": "${TWITTER_ACCESS_TOKEN}",
-      "access_token_secret": "${TWITTER_ACCESS_TOKEN_SECRET}"
     },
-    "linkedin": {
-      "client_id": "${LINKEDIN_CLIENT_ID}",
-      "client_secret": "${LINKEDIN_CLIENT_SECRET}",
-      "access_token": "${LINKEDIN_ACCESS_TOKEN}"
-    },
-    "facebook": {
-      "app_id": "${FACEBOOK_APP_ID}",
-      "app_secret": "${FACEBOOK_APP_SECRET}",
-      "access_token": "${FACEBOOK_ACCESS_TOKEN}",
-      "page_id": "${FACEBOOK_PAGE_ID}"
-    }
-  },
-  "email": {
-    "mailchimp": {
-      "api_key": "${MAILCHIMP_API_KEY}",
-      "server_prefix": "${MAILCHIMP_SERVER_PREFIX}",
-      "list_id": "${MAILCHIMP_LIST_ID}"
+    "taskRouting": {
+      "default": "anthropic",
+      "contentGeneration": "anthropic",
+      "seoAnalysis": "openai",
+      "categorisation": "openai",
+      "summaries": "anthropic",
+      "embeddings": "openai"
     }
   },
   "analytics": {
-    "google_analytics": {
-      "view_id": "${GA_VIEW_ID}",
-      "client_email": "${GA_CLIENT_EMAIL}",
-      "private_key": "${GA_PRIVATE_KEY}"
+    "enabled": true,
+    "providers": {
+      "internal": {
+        "enabled": true,
+        "dataRetention": 365
+      },
+      "googleAnalytics": {
+        "enabled": false,
+        "propertyId": "",
+        "viewId": ""
+      },
+      "amplitude": {
+        "enabled": false,
+        "apiKey": ""
+      }
+    }
+  },
+  "publishing": {
+    "wordpress": {
+      "enabled": false,
+      "endpoint": "",
+      "username": "",
+      "applicationPassword": ""
     },
-    "search_console": {
-      "client_email": "${GSC_CLIENT_EMAIL}",
-      "private_key": "${GSC_PRIVATE_KEY}",
-      "site_url": "${GSC_SITE_URL}"
+    "contentful": {
+      "enabled": false,
+      "spaceId": "",
+      "accessToken": ""
+    },
+    "strapi": {
+      "enabled": false,
+      "endpoint": "",
+      "apiToken": ""
+    }
+  },
+  "social": {
+    "twitter": {
+      "enabled": false,
+      "apiKey": "",
+      "apiSecret": "",
+      "accessToken": "",
+      "accessTokenSecret": ""
+    },
+    "linkedin": {
+      "enabled": false,
+      "clientId": "",
+      "clientSecret": "",
+      "accessToken": ""
+    },
+    "facebook": {
+      "enabled": false,
+      "appId": "",
+      "appSecret": "",
+      "accessToken": ""
     }
   },
   "seo": {
     "semrush": {
-      "api_key": "${SEMRUSH_API_KEY}"
+      "enabled": false,
+      "apiKey": ""
     },
     "ahrefs": {
-      "api_key": "${AHREFS_API_KEY}"
+      "enabled": false,
+      "apiKey": ""
+    },
+    "moz": {
+      "enabled": false,
+      "accessId": "",
+      "secretKey": ""
     }
+  },
+  "email": {
+    "provider": "nodemailer",
+    "settings": {
+      "host": "",
+      "port": 587,
+      "secure": true,
+      "auth": {
+        "user": "",
+        "pass": ""
+      }
+    },
+    "defaultFrom": "ai-agents@landingpaddigital.com"
   }
 }

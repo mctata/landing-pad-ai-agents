@@ -1,79 +1,146 @@
 {
-  "primary": {
-    "type": "mongodb",
-    "connection_string": "${MONGODB_URI}",
-    "database": "landing_pad_ai_agents",
+  "mongodb": {
+    "uri": "${MONGODB_URI}",
     "options": {
-      "useNewUrlParser": true,
       "useUnifiedTopology": true,
-      "retryWrites": true
+      "retryWrites": true,
+      "w": "majority",
+      "maxPoolSize": 10,
+      "connectTimeoutMS": 30000
+    },
+    "collections": {
+      "agents": {
+        "indexes": [
+          {
+            "key": { "id": 1 },
+            "unique": true
+          },
+          {
+            "key": { "status": 1 }
+          }
+        ]
+      },
+      "content": {
+        "indexes": [
+          {
+            "key": { "id": 1 },
+            "unique": true
+          },
+          {
+            "key": { "type": 1 }
+          },
+          {
+            "key": { "status": 1 }
+          },
+          {
+            "key": { "createdAt": -1 }
+          },
+          {
+            "key": { "updatedAt": -1 }
+          },
+          {
+            "key": { "tags": 1 }
+          }
+        ]
+      },
+      "briefs": {
+        "indexes": [
+          {
+            "key": { "id": 1 },
+            "unique": true
+          },
+          {
+            "key": { "status": 1 }
+          },
+          {
+            "key": { "createdAt": -1 }
+          },
+          {
+            "key": { "contentType": 1 }
+          }
+        ]
+      },
+      "metrics": {
+        "indexes": [
+          {
+            "key": { "contentId": 1, "date": 1 },
+            "unique": true
+          },
+          {
+            "key": { "contentId": 1 }
+          },
+          {
+            "key": { "date": -1 }
+          },
+          {
+            "key": { "metricType": 1 }
+          }
+        ]
+      },
+      "schedules": {
+        "indexes": [
+          {
+            "key": { "contentId": 1 },
+            "unique": true
+          },
+          {
+            "key": { "scheduledDate": 1 }
+          },
+          {
+            "key": { "status": 1 }
+          }
+        ]
+      },
+      "reports": {
+        "indexes": [
+          {
+            "key": { "id": 1 },
+            "unique": true
+          },
+          {
+            "key": { "type": 1 }
+          },
+          {
+            "key": { "date": -1 }
+          }
+        ]
+      },
+      "brand_guidelines": {
+        "indexes": [
+          {
+            "key": { "id": 1 },
+            "unique": true
+          },
+          {
+            "key": { "type": 1 }
+          },
+          {
+            "key": { "updatedAt": -1 }
+          }
+        ]
+      }
     }
   },
-  "collections": {
-    "agents": {
-      "indexes": [
-        { "fields": { "name": 1 }, "options": { "unique": true } }
-      ]
+  "fileStorage": {
+    "type": "local",
+    "basePath": "./storage",
+    "directories": {
+      "briefs": "briefs",
+      "content": "content",
+      "reports": "reports",
+      "assets": "assets",
+      "templates": "templates"
     },
-    "content_briefs": {
-      "indexes": [
-        { "fields": { "created_at": 1 } },
-        { "fields": { "status": 1 } },
-        { "fields": { "type": 1 } }
-      ]
-    },
-    "content": {
-      "indexes": [
-        { "fields": { "created_at": 1 } },
-        { "fields": { "status": 1 } },
-        { "fields": { "type": 1 } },
-        { "fields": { "brief_id": 1 } }
-      ]
-    },
-    "publications": {
-      "indexes": [
-        { "fields": { "content_id": 1 } },
-        { "fields": { "platform": 1 } },
-        { "fields": { "scheduled_at": 1 } },
-        { "fields": { "status": 1 } }
-      ]
-    },
-    "optimisation_reports": {
-      "indexes": [
-        { "fields": { "content_id": 1 } },
-        { "fields": { "created_at": 1 } }
-      ]
-    },
-    "brand_evaluations": {
-      "indexes": [
-        { "fields": { "content_id": 1 } },
-        { "fields": { "created_at": 1 } }
-      ]
-    },
-    "workflows": {
-      "indexes": [
-        { "fields": { "started_at": 1 } },
-        { "fields": { "status": 1 } }
-      ]
-    },
-    "users": {
-      "indexes": [
-        { "fields": { "email": 1 }, "options": { "unique": true } }
-      ]
+    "options": {
+      "maxFileSize": 10485760,
+      "allowedExtensions": [".md", ".json", ".txt", ".html", ".jpg", ".png", ".svg"]
     }
-  },
-  "file_storage": {
-    "type": "s3",
-    "bucket": "${S3_BUCKET}",
-    "region": "${AWS_REGION}",
-    "access_key_id": "${AWS_ACCESS_KEY_ID}",
-    "secret_access_key": "${AWS_SECRET_ACCESS_KEY}"
   },
   "cache": {
-    "type": "redis",
-    "host": "${REDIS_HOST}",
-    "port": "${REDIS_PORT}",
-    "password": "${REDIS_PASSWORD}",
-    "ttl": 3600
+    "type": "memory",
+    "options": {
+      "maxSize": 1000,
+      "ttl": 3600
+    }
   }
 }

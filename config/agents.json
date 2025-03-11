@@ -1,147 +1,210 @@
 {
-  "content_strategy": {
-    "enabled": true,
-    "priorities": ["audience_relevance", "brand_goals", "seo_performance"],
-    "data_sources": ["google_analytics", "search_console", "social_media_insights"],
-    "refresh_interval": 3600,
-    "max_concurrent_tasks": 5,
-    "ai_model": {
-      "provider": "openai",
-      "model": "gpt-4-turbo",
-      "temperature": 0.3,
-      "max_tokens": 2000
-    },
+  "contentStrategy": {
+    "id": "content-strategy",
+    "name": "Content Strategy Agent",
+    "description": "Analyses audience data and trends to inform content decisions",
     "modules": {
-      "trend_analyzer": {
+      "trendAnalyzer": {
         "enabled": true,
-        "refresh_interval": 86400,
-        "data_retention_days": 90
-      },
-      "audience_insights": {
-        "enabled": true,
-        "primary_segments": ["small_business", "freelancers", "marketing_agencies"],
-        "data_sources": ["customer_surveys", "website_behavior", "social_engagement"]
-      },
-      "brief_generator": {
-        "enabled": true,
-        "templates": ["blog_post", "landing_page", "social_campaign", "email_newsletter"],
-        "required_sections": ["target_audience", "key_messages", "content_structure", "keywords"]
-      }
-    }
-  },
-  "content_creation": {
-    "enabled": true,
-    "content_types": ["blog", "social", "landing_page", "email"],
-    "max_concurrent_tasks": 3,
-    "ai_model": {
-      "provider": "anthropic",
-      "model": "claude-3-opus-20240229",
-      "temperature": 0.7,
-      "max_tokens": 4000
-    },
-    "modules": {
-      "blog_generator": {
-        "enabled": true,
-        "formats": ["how_to", "listicle", "case_study", "thought_leadership"],
-        "min_word_count": 800,
-        "max_word_count": 2500
-      },
-      "social_media_generator": {
-        "enabled": true,
-        "platforms": ["twitter", "linkedin", "facebook", "instagram"],
-        "content_per_platform": 3
-      },
-      "landing_page_generator": {
-        "enabled": true,
-        "sections": ["hero", "features", "benefits", "testimonials", "cta"],
-        "tone": "professional"
-      }
-    }
-  },
-  "content_management": {
-    "enabled": true,
-    "platforms": ["wordpress", "social_media", "email_marketing"],
-    "publishing_schedule": {
-      "blog": ["monday", "wednesday", "friday"],
-      "social": ["daily"],
-      "email": ["thursday"]
-    },
-    "max_scheduled_content": 30,
-    "modules": {
-      "scheduler": {
-        "enabled": true,
-        "look_ahead_days": 14,
-        "publishing_times": {
-          "blog": "09:00",
-          "social": ["07:00", "12:00", "17:00"],
-          "email": "10:00"
+        "settings": {
+          "updateFrequency": "daily",
+          "dataSources": ["industry-news", "social-media", "search-trends"],
+          "relevanceThreshold": 0.6
         }
       },
-      "publisher": {
+      "audienceInsights": {
         "enabled": true,
-        "auto_publish": true,
-        "retry_attempts": 3,
-        "require_approval": true
+        "settings": {
+          "segmentCount": 5,
+          "updateFrequency": "weekly",
+          "minDataPoints": 100
+        }
       },
-      "content_repository": {
+      "briefGenerator": {
         "enabled": true,
-        "storage_type": "mongodb",
-        "versioning": true,
-        "backup_frequency": "daily"
+        "settings": {
+          "defaultTemplate": "standard",
+          "keywordCount": 5,
+          "briefLength": "medium"
+        }
+      }
+    }
+  },
+  "contentCreation": {
+    "id": "content-creation",
+    "name": "Content Creation Agent",
+    "description": "Generates high-quality blog posts, website copy, and social media content",
+    "modules": {
+      "blogGenerator": {
+        "enabled": true,
+        "settings": {
+          "defaultWordCount": 1200,
+          "headingStyle": "sentence-case",
+          "includeFeaturedImage": true
+        }
+      },
+      "socialMediaGenerator": {
+        "enabled": true,
+        "settings": {
+          "platforms": ["twitter", "linkedin", "facebook"],
+          "imagesPerPost": 1,
+          "hashtagLimit": 3
+        }
+      },
+      "websiteCopyGenerator": {
+        "enabled": true,
+        "settings": {
+          "pageTypes": ["home", "about", "features", "pricing", "contact"],
+          "ctaStyle": "action-oriented",
+          "tonality": "professional"
+        }
+      },
+      "headlineGenerator": {
+        "enabled": true,
+        "settings": {
+          "style": "benefit-driven",
+          "maxLength": 60,
+          "abTestingEnabled": true
+        }
+      },
+      "contentEditor": {
+        "enabled": true,
+        "settings": {
+          "grammarCheckLevel": "strict",
+          "styleSuggestions": true,
+          "toneConsistencyCheck": true
+        }
+      }
+    }
+  },
+  "contentManagement": {
+    "id": "content-management",
+    "name": "Content Management Agent",
+    "description": "Organises, categorises, and tracks content across platforms",
+    "modules": {
+      "contentCategoriser": {
+        "enabled": true,
+        "settings": {
+          "taxonomyDepth": 3,
+          "minConfidenceScore": 0.7,
+          "autoTagging": true
+        }
+      },
+      "contentTracker": {
+        "enabled": true,
+        "settings": {
+          "platforms": ["website", "blog", "social"],
+          "updateFrequency": "hourly",
+          "notificationEnabled": true
+        }
+      },
+      "freshnessChecker": {
+        "enabled": true,
+        "settings": {
+          "freshnessThreshold": 90,
+          "contentTypes": ["blog", "product-page", "landing-page"],
+          "priorityCategories": ["features", "pricing"]
+        }
+      },
+      "workflowManager": {
+        "enabled": true,
+        "settings": {
+          "stages": ["draft", "review", "approved", "scheduled", "published"],
+          "autoProgressEnabled": false,
+          "reminderFrequency": "daily"
+        }
       }
     }
   },
   "optimisation": {
-    "enabled": true,
-    "metrics": ["traffic", "engagement", "conversion", "ranking"],
-    "analysis_period_days": 30,
-    "auto_improve": true,
+    "id": "optimisation",
+    "name": "Optimisation Agent",
+    "description": "Analyses performance metrics and provides SEO recommendations",
     "modules": {
-      "seo_analyzer": {
+      "seoOptimizer": {
         "enabled": true,
-        "on_page_factors": ["keywords", "headings", "meta_tags", "content_quality"],
-        "off_page_factors": ["backlinks", "social_signals"]
+        "settings": {
+          "keywordDensityTarget": 2.0,
+          "titleLengthRange": [40, 60],
+          "metaDescriptionLengthRange": [120, 160],
+          "headingStructureCheck": true
+        }
       },
-      "performance_tracker": {
+      "performanceAnalyzer": {
         "enabled": true,
-        "metrics": ["page_views", "time_on_page", "bounce_rate", "conversions"],
-        "comparison_window_days": 90
+        "settings": {
+          "metrics": ["pageviews", "time-on-page", "bounce-rate", "conversion-rate"],
+          "benchmarkSource": "industry-average",
+          "timeframeOptions": ["day", "week", "month", "quarter"]
+        }
       },
-      "recommendation_engine": {
+      "abTestingGenerator": {
         "enabled": true,
-        "recommendation_types": ["content_improvements", "topic_ideas", "distribution_channels"],
-        "max_recommendations": 10
+        "settings": {
+          "elementTypes": ["headline", "cta", "hero-image", "form"],
+          "variationsPerElement": 3,
+          "minTestDuration": 7,
+          "significanceThreshold": 0.05
+        }
+      },
+      "metricsTracker": {
+        "enabled": true,
+        "settings": {
+          "trackingFrequency": "hourly",
+          "storageRetention": 365,
+          "alertThresholds": {
+            "trafficDrop": 30,
+            "conversionDrop": 15,
+            "engagementDrop": 20
+          }
+        }
+      },
+      "reporting": {
+        "enabled": true,
+        "settings": {
+          "automatedReports": ["daily-summary", "weekly-detailed", "monthly-comprehensive"],
+          "distributionList": ["team", "management"],
+          "visualizationsEnabled": true
+        }
       }
     }
   },
-  "brand_consistency": {
-    "enabled": true,
-    "brand_guidelines_path": "assets/brand/guidelines.md",
-    "check_levels": ["mandatory", "recommended"],
+  "brandConsistency": {
+    "id": "brand-consistency",
+    "name": "Brand Consistency Agent",
+    "description": "Maintains Landing Pad Digital's voice, tone, and messaging",
     "modules": {
-      "tone_analyzer": {
+      "consistencyChecker": {
         "enabled": true,
-        "tone_attributes": ["professional", "helpful", "innovative", "trustworthy"],
-        "min_compliance_score": 0.8
+        "settings": {
+          "toneAttributes": ["professional", "helpful", "clear", "authoritative"],
+          "strictnessLevel": 3,
+          "autoFlagEnabled": true
+        }
       },
-      "message_validator": {
+      "terminologyChecker": {
         "enabled": true,
-        "key_messages": [
-          "AI-powered website creation",
-          "Time-saving solutions",
-          "Professional results",
-          "No coding required"
-        ],
-        "prohibited_claims": [
-          "guaranteed success",
-          "best on the market",
-          "instant results"
-        ]
+        "settings": {
+          "glossarySource": "brand-terminology",
+          "caseSensitive": true,
+          "suggestionEnabled": true
+        }
       },
-      "brand_guidelines": {
+      "consistencyFixer": {
         "enabled": true,
-        "elements": ["logo_usage", "color_palette", "typography", "voice_and_tone"],
-        "update_frequency": "monthly"
+        "settings": {
+          "autoFixLevel": "suggestion",
+          "priorityIssues": ["incorrect-terminology", "tone-mismatch", "messaging-conflict"],
+          "explanationsEnabled": true
+        }
+      },
+      "alignedGenerator": {
+        "enabled": true,
+        "settings": {
+          "referenceContent": "brand-exemplars",
+          "alignmentStrength": 0.8,
+          "preserveKeyMessages": true
+        }
       }
     }
   }

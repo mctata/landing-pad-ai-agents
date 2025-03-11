@@ -1,90 +1,219 @@
 {
-  "broker": {
-    "type": "rabbitmq",
-    "host": "${RABBITMQ_HOST}",
-    "port": "${RABBITMQ_PORT}",
-    "username": "${RABBITMQ_USERNAME}",
-    "password": "${RABBITMQ_PASSWORD}",
-    "vhost": "landing-pad",
-    "ssl": true
+  "rabbitMQ": {
+    "uri": "${RABBITMQ_URI}",
+    "options": {
+      "heartbeat": 60,
+      "prefetch": 1,
+      "connectionTimeout": 30000,
+      "reconnectStrategy": {
+        "retries": 10,
+        "initialDelay": 1000,
+        "maxDelay": 30000,
+        "factor": 2
+      }
+    }
   },
   "exchanges": {
-    "agent_commands": {
-      "type": "direct",
-      "durable": true
-    },
-    "agent_events": {
+    "agent-events": {
       "type": "topic",
-      "durable": true
+      "options": {
+        "durable": true
+      }
     },
-    "content_updates": {
+    "agent-commands": {
+      "type": "direct",
+      "options": {
+        "durable": true
+      }
+    },
+    "system-notifications": {
       "type": "fanout",
-      "durable": true
+      "options": {
+        "durable": true
+      }
     }
   },
   "queues": {
-    "content_strategy_commands": {
-      "binding": {
-        "exchange": "agent_commands",
-        "routing_key": "content_strategy"
+    "content-strategy-commands": {
+      "options": {
+        "durable": true
       },
-      "durable": true,
-      "prefetch": 5
+      "bindings": [
+        {
+          "exchange": "agent-commands",
+          "routingKey": "content-strategy"
+        }
+      ]
     },
-    "content_creation_commands": {
-      "binding": {
-        "exchange": "agent_commands",
-        "routing_key": "content_creation"
+    "content-creation-commands": {
+      "options": {
+        "durable": true
       },
-      "durable": true,
-      "prefetch": 3
+      "bindings": [
+        {
+          "exchange": "agent-commands",
+          "routingKey": "content-creation"
+        }
+      ]
     },
-    "content_management_commands": {
-      "binding": {
-        "exchange": "agent_commands",
-        "routing_key": "content_management"
+    "content-management-commands": {
+      "options": {
+        "durable": true
       },
-      "durable": true,
-      "prefetch": 5
+      "bindings": [
+        {
+          "exchange": "agent-commands",
+          "routingKey": "content-management"
+        }
+      ]
     },
-    "optimisation_commands": {
-      "binding": {
-        "exchange": "agent_commands",
-        "routing_key": "optimisation"
+    "optimisation-commands": {
+      "options": {
+        "durable": true
       },
-      "durable": true,
-      "prefetch": 5
+      "bindings": [
+        {
+          "exchange": "agent-commands",
+          "routingKey": "optimisation"
+        }
+      ]
     },
-    "brand_consistency_commands": {
-      "binding": {
-        "exchange": "agent_commands",
-        "routing_key": "brand_consistency"
+    "brand-consistency-commands": {
+      "options": {
+        "durable": true
       },
-      "durable": true,
-      "prefetch": 5
+      "bindings": [
+        {
+          "exchange": "agent-commands",
+          "routingKey": "brand-consistency"
+        }
+      ]
+    },
+    "strategy-events": {
+      "options": {
+        "durable": true
+      },
+      "bindings": [
+        {
+          "exchange": "agent-events",
+          "routingKey": "content-strategy.#"
+        }
+      ]
+    },
+    "creation-events": {
+      "options": {
+        "durable": true
+      },
+      "bindings": [
+        {
+          "exchange": "agent-events",
+          "routingKey": "content-creation.#"
+        }
+      ]
+    },
+    "management-events": {
+      "options": {
+        "durable": true
+      },
+      "bindings": [
+        {
+          "exchange": "agent-events",
+          "routingKey": "content-management.#"
+        }
+      ]
+    },
+    "optimisation-events": {
+      "options": {
+        "durable": true
+      },
+      "bindings": [
+        {
+          "exchange": "agent-events",
+          "routingKey": "optimisation.#"
+        }
+      ]
+    },
+    "brand-consistency-events": {
+      "options": {
+        "durable": true
+      },
+      "bindings": [
+        {
+          "exchange": "agent-events",
+          "routingKey": "brand-consistency.#"
+        }
+      ]
+    },
+    "system-notifications-queue": {
+      "options": {
+        "durable": true
+      },
+      "bindings": [
+        {
+          "exchange": "system-notifications",
+          "routingKey": ""
+        }
+      ]
     }
   },
-  "message_schemas": {
-    "command": {
-      "id": "string",
-      "type": "string",
-      "agent": "string",
-      "payload": "object",
-      "timestamp": "datetime",
-      "correlation_id": "string"
-    },
-    "event": {
-      "id": "string",
-      "type": "string",
-      "agent": "string",
-      "payload": "object",
-      "timestamp": "datetime",
-      "correlation_id": "string"
-    }
-  },
-  "retry": {
-    "max_attempts": 3,
-    "initial_interval": 1000,
-    "multiplier": 2
+  "subscriptions": {
+    "content-strategy": [
+      {
+        "event": "content-management.content.published",
+        "description": "Listen for published content to update strategy"
+      },
+      {
+        "event": "optimisation.performance.reported",
+        "description": "Listen for performance reports to adjust strategy"
+      }
+    ],
+    "content-creation": [
+      {
+        "event": "content-strategy.brief.created",
+        "description": "Listen for new briefs to create content"
+      },
+      {
+        "event": "brand-consistency.feedback.provided",
+        "description": "Listen for brand feedback to adjust content"
+      },
+      {
+        "event": "optimisation.seo.recommendations",
+        "description": "Listen for SEO recommendations to improve content"
+      }
+    ],
+    "content-management": [
+      {
+        "event": "content-creation.content.created",
+        "description": "Listen for new content to manage"
+      },
+      {
+        "event": "brand-consistency.content.approved",
+        "description": "Listen for approved content to schedule"
+      },
+      {
+        "event": "optimisation.content.optimised",
+        "description": "Listen for optimised content to republish"
+      }
+    ],
+    "optimisation": [
+      {
+        "event": "content-management.content.published",
+        "description": "Listen for published content to track metrics"
+      },
+      {
+        "event": "content-creation.content.created",
+        "description": "Listen for new content to provide SEO recommendations"
+      }
+    ],
+    "brand-consistency": [
+      {
+        "event": "content-creation.content.created",
+        "description": "Listen for new content to check consistency"
+      },
+      {
+        "event": "content-management.content.updated",
+        "description": "Listen for updated content to recheck consistency"
+      }
+    ]
   }
 }
