@@ -8,6 +8,7 @@ const WordPressIntegration = require('../src/integrations/cms/wordpressIntegrati
 const ShopifyIntegration = require('../src/integrations/cms/shopifyIntegration');
 
 // Social Media Integrations
+const TwitterIntegration = require('../src/integrations/social/twitterIntegration');
 const BlueskyIntegration = require('../src/integrations/social/blueskyIntegration');
 const FacebookIntegration = require('../src/integrations/social/facebookIntegration');
 const LinkedInIntegration = require('../src/integrations/social/linkedinIntegration');
@@ -89,7 +90,14 @@ class IntegrationService {
     try {
       this.logger.info('Initializing social media integrations');
       
-      // Bluesky (replacing Twitter)
+      // Twitter/X
+      if (this.config.social && this.config.social.twitter) {
+        const twitterConfig = this.config.social.twitter;
+        this.integrations.social.twitter = new TwitterIntegration(twitterConfig, this.logger);
+        await this.integrations.social.twitter.initialize();
+      }
+      
+      // Bluesky
       if (this.config.social && this.config.social.bluesky) {
         const blueskyConfig = this.config.social.bluesky;
         this.integrations.social.bluesky = new BlueskyIntegration(blueskyConfig);
@@ -484,6 +492,50 @@ class IntegrationService {
   }
 
   /**
+   * Post a thread or multi-part content to Twitter
+   * @param {Object} contentData - Content data to post
+   * @returns {Object} - Posted thread data
+   */
+  async postTwitterThread(contentData) {
+    try {
+      if (\!this.isInitialized) {
+        throw new Error('Integration Service not initialized');
+      }
+      
+      const twitter = this.integrations.social.twitter;
+      
+      if (\!twitter) {
+        throw new Error('Twitter integration not found');
+      }
+      
+      if (\!twitter.isConnected) {
+        throw new Error('Twitter integration not connected');
+      }
+      
+      this.logger.info('Posting thread to Twitter');
+      
+      const result = await twitter.publishThread(contentData);
+      
+      this.logger.info(`Thread posted to Twitter successfully with ${result.threadIds.length} tweets`);
+      
+      return {
+        success: true,
+        platform: 'twitter',
+        threadIds: result.threadIds,
+        url: result.url
+      };
+    } catch (error) {
+      this.logger.error('Error posting thread to Twitter:', error);
+      
+      return {
+        success: false,
+        platform: 'twitter',
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Post to LinkedIn
    * @param {Object} contentData - Content data to post
    * @returns {Object} - Posted content data
@@ -629,6 +681,9 @@ class IntegrationService {
       let metrics;
       
       switch (platform.toLowerCase()) {
+        case 'twitter':
+          metrics = await integration.getTweetMetrics(externalId);
+          break;
         case 'bluesky':
           // Bluesky doesn't have a direct way to get metrics for a single post
           // So we'll just get the profile metrics instead

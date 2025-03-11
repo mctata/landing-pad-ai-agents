@@ -39,12 +39,24 @@ const mockIntegrations = {
     { 
       id: 'twitter', 
       name: 'Twitter/X', 
-      status: 'error', 
-      lastSync: '2025-03-10T22:45:00Z',
-      error: 'Authentication token expired',
+      status: 'connected', 
+      lastSync: '2025-03-11T08:30:00Z',
       config: {
         apiKey: '***********',
         apiSecret: '***********',
+        accessToken: '***********',
+        accessTokenSecret: '***********',
+        enabled: true
+      }
+    },
+    { 
+      id: 'bluesky', 
+      name: 'Bluesky', 
+      status: 'connected', 
+      lastSync: '2025-03-11T10:45:00Z',
+      config: {
+        username: 'landingpad.bsky.social',
+        appPassword: '***********',
         enabled: true
       }
     },
@@ -57,6 +69,32 @@ const mockIntegrations = {
         appId: '***********',
         appSecret: '***********',
         pageId: '***********',
+        enabled: true
+      }
+    },
+    { 
+      id: 'linkedin', 
+      name: 'LinkedIn', 
+      status: 'connected', 
+      lastSync: '2025-03-11T09:30:00Z',
+      config: {
+        clientId: '***********',
+        clientSecret: '***********',
+        accessToken: '***********',
+        refreshToken: '***********',
+        companyId: '12345678',
+        enabled: true
+      }
+    },
+    { 
+      id: 'instagram', 
+      name: 'Instagram', 
+      status: 'connected', 
+      lastSync: '2025-03-11T10:15:00Z',
+      config: {
+        accessToken: '***********',
+        fbPageId: '***********',
+        igBusinessAccountId: '***********',
         enabled: true
       }
     }

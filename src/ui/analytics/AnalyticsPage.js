@@ -71,19 +71,21 @@ const mockAnalyticsData = {
   
   // Social media engagement
   socialEngagement: {
-    labels: ['Facebook', 'Twitter/X', 'LinkedIn', 'Instagram'],
+    labels: ['Facebook', 'Twitter/X', 'Bluesky', 'LinkedIn', 'Instagram'],
     datasets: [
       {
         label: 'Engagement',
-        data: [1200, 800, 1500, 950],
+        data: [1200, 780, 680, 1500, 950],
         backgroundColor: [
           'rgba(255, 99, 132, 0.5)',
+          'rgba(153, 102, 255, 0.5)',
           'rgba(54, 162, 235, 0.5)',
           'rgba(255, 206, 86, 0.5)',
           'rgba(75, 192, 192, 0.5)',
         ],
         borderColor: [
           'rgba(255, 99, 132, 1)',
+          'rgba(153, 102, 255, 1)',
           'rgba(54, 162, 235, 1)',
           'rgba(255, 206, 86, 1)',
           'rgba(75, 192, 192, 1)',
@@ -324,11 +326,11 @@ function AnalyticsPage() {
             <ChartContainer title="Social Media Traffic">
               <Box sx={{ height: 350 }}>
                 <Bar options={barOptions} data={{
-                  labels: ['Facebook', 'Twitter/X', 'LinkedIn', 'Instagram'],
+                  labels: ['Facebook', 'Twitter/X', 'Bluesky', 'LinkedIn', 'Instagram'],
                   datasets: [
                     {
                       label: 'Sessions',
-                      data: [3200, 2400, 2800, 1900],
+                      data: [3200, 2400, 1850, 2800, 1900],
                       backgroundColor: 'rgba(53, 162, 235, 0.5)',
                     },
                   ],

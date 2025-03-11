@@ -83,8 +83,10 @@ const publishDestinations = [
   { id: 'shopify', name: 'Shopify Blog', type: 'cms', icon: '🛍️' },
   { id: 'medium', name: 'Medium', type: 'cms', icon: '📝' },
   { id: 'twitter', name: 'Twitter/X', type: 'social', icon: '🐦' },
+  { id: 'bluesky', name: 'Bluesky', type: 'social', icon: '🔵' },
   { id: 'facebook', name: 'Facebook', type: 'social', icon: '👍' },
   { id: 'linkedin', name: 'LinkedIn', type: 'social', icon: '💼' },
+  { id: 'instagram', name: 'Instagram', type: 'social', icon: '📷' },
   { id: 'mailchimp', name: 'Mailchimp', type: 'email', icon: '📧' },
 ];
 
