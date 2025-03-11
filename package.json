@@ -50,6 +50,7 @@
   "homepage": "https://github.com/mctata/landing-pad-ai-agents#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.15.0",
+    "@atproto/api": "^0.12.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.0",
@@ -66,6 +67,7 @@
     "express": "^4.18.3",
     "express-rate-limit": "^7.2.0",
     "fb": "^2.0.0",
+    "form-data": "^4.0.0",
     "google-analytics-data": "^3.2.0",
     "helmet": "^7.1.0",
     "joi": "^17.12.2",
@@ -85,7 +87,6 @@
     "react-scripts": "^5.0.1",
     "redis": "^4.6.13",
     "shopify-api-node": "^3.12.3",
-    "twitter-api-v2": "^1.15.0",
     "winston": "^3.12.0"
   },
   "devDependencies": {
