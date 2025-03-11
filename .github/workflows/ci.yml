@@ -36,9 +36,36 @@ jobs:
     - name: Run linting
       run: npm run lint
     
-    - name: Run tests
-      run: npm test
+    - name: Run unit tests
+      run: npm run test:unit
       env:
         MONGODB_URI: mongodb://localhost:27017/landing_pad_ai_agents_test
         NODE_ENV: test
         JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+        
+    - name: Run integration tests
+      run: npm run test:integration
+      env:
+        MONGODB_URI: mongodb://localhost:27017/landing_pad_ai_agents_test
+        NODE_ENV: test
+        JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+        
+    - name: Run API tests
+      run: npm run test:api
+      env:
+        MONGODB_URI: mongodb://localhost:27017/landing_pad_ai_agents_test
+        NODE_ENV: test
+        JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+        
+    - name: Generate test coverage
+      run: npm run test:ci
+      env:
+        MONGODB_URI: mongodb://localhost:27017/landing_pad_ai_agents_test
+        NODE_ENV: test
+        JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+        
+    - name: Upload test coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage/
