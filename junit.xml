@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="25" failures="25" errors="0" time="37.373">
+  <testsuite name="Agent Model" errors="0" failures="8" skipped="0" timestamp="2025-03-11T10:28:37" time="35.63" tests="8">
+    <testcase classname="Agent Model should generate a valid agentId" name="Agent Model should generate a valid agentId" time="0.014">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should create a new agent document" name="Agent Model should create a new agent document" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should update agent activity timestamp" name="Agent Model should update agent activity timestamp" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should record request and update performance metrics" name="Agent Model should record request and update performance metrics" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should enforce required fields" name="Agent Model should enforce required fields" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should enforce enum values for type field" name="Agent Model should enforce enum values for type field" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should enforce enum values for status field" name="Agent Model should enforce enum values for status field" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Agent Model should properly structure module configuration" name="Agent Model should properly structure module configuration" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:9:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/agentModel.test.js:8:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="User Model" errors="0" failures="10" skipped="0" timestamp="2025-03-11T10:28:38" time="35.693" tests="10">
+    <testcase classname="User Model should generate a valid userId" name="User Model should generate a valid userId" time="0.007">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should create a new user document" name="User Model should create a new user document" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should hash the password before saving" name="User Model should hash the password before saving" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should only hash password when modified" name="User Model should only hash password when modified" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should compare passwords correctly" name="User Model should compare passwords correctly" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should have a virtual for fullName" name="User Model should have a virtual for fullName" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should exclude password when converting to JSON" name="User Model should exclude password when converting to JSON" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should enforce unique email constraint" name="User Model should enforce unique email constraint" time="0.001">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should enforce required fields" name="User Model should enforce required fields" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="User Model should enforce enum values for roles" name="User Model should enforce enum values for roles" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:20:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/userModel.test.js:19:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="Content Model" errors="0" failures="7" skipped="0" timestamp="2025-03-11T10:28:41" time="32.714" tests="7">
+    <testcase classname="Content Model should generate a valid contentId" name="Content Model should generate a valid contentId" time="0.006">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Content Model should create a new content document" name="Content Model should create a new content document" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Content Model should automatically create a slug from title" name="Content Model should automatically create a slug from title" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Content Model should increment version number when updating content" name="Content Model should increment version number when updating content" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Content Model should enforce required fields" name="Content Model should enforce required fields" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Content Model should enforce enum values for type field" name="Content Model should enforce enum values for type field" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="Content Model should enforce enum values for status field" name="Content Model should enforce enum values for status field" time="0">
+      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a hook.
+Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
+    at beforeAll (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:10:3)
+    at _dispatchDescribe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:91:26)
+    at describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/index.js:55:5)
+    at Object.describe (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/__tests__/unit/models/contentModel.test.js:9:1)
+    at Runtime._execModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1439:24)
+    at Runtime._loadModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:1022:12)
+    at Runtime.requireModule (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runtime/build/index.js:882:12)
+    at jestAdapter (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at runTestInternal (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/tanialopes/Desktop/Projects/landing-pad-ai-agents/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
