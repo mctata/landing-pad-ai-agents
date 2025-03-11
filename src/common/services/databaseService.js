@@ -145,13 +145,13 @@ class DatabaseService {
    */
   async updateContent(contentId, updateData) {
     try {
-      // Get current content
+      // Get current content to save as a version
       const content = await this.getContent(contentId);
       if (!content) {
         throw new Error(`Content with ID ${contentId} not found`);
       }
       
-      // Create version before updating
+      // Save current state as a version (before applying updates)
       await this.createContentVersion(contentId, content.toObject(), updateData.updatedBy || 'system');
       
       // Update content
@@ -161,7 +161,7 @@ class DatabaseService {
         { new: true, runValidators: true }
       );
       
-      this.logger.info(`Content ${contentId} updated`);
+      this.logger.info(`Content ${contentId} updated from "${content.title}" to "${updatedContent.title}"`);
       return updatedContent;
     } catch (error) {
       this.logger.error(`Error updating content ${contentId}:`, error);
@@ -178,7 +178,17 @@ class DatabaseService {
    */
   async createContentVersion(contentId, contentData, createdBy) {
     try {
-      const version = contentData.version || 1;
+      // Find the latest version and increment it
+      let version = 1;
+      const latestVersion = await this.models.ContentVersion.findOne(
+        { contentId }, 
+        { version: 1 }, 
+        { sort: { version: -1 } }
+      );
+      
+      if (latestVersion) {
+        version = latestVersion.version + 1;
+      }
       
       const contentVersion = new this.models.ContentVersion({
         contentId,
@@ -189,6 +199,7 @@ class DatabaseService {
       
       await contentVersion.save();
       
+      this.logger.info(`Created version ${version} for content ${contentId}`);
       return contentVersion;
     } catch (error) {
       this.logger.error(`Error creating content version for ${contentId}:`, error);
