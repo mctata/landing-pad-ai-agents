@@ -8,8 +8,10 @@ const WordPressIntegration = require('../src/integrations/cms/wordpressIntegrati
 const ShopifyIntegration = require('../src/integrations/cms/shopifyIntegration');
 
 // Social Media Integrations
-const TwitterIntegration = require('../src/integrations/social/twitterIntegration');
+const BlueskyIntegration = require('../src/integrations/social/blueskyIntegration');
 const FacebookIntegration = require('../src/integrations/social/facebookIntegration');
+const LinkedInIntegration = require('../src/integrations/social/linkedinIntegration');
+const InstagramIntegration = require('../src/integrations/social/instagramIntegration');
 
 // Analytics Integrations
 const GoogleAnalyticsConnector = require('../src/integrations/analytics/googleAnalyticsConnector');
@@ -87,11 +89,11 @@ class IntegrationService {
     try {
       this.logger.info('Initializing social media integrations');
       
-      // Twitter
-      if (this.config.social && this.config.social.twitter) {
-        const twitterConfig = this.config.social.twitter;
-        this.integrations.social.twitter = new TwitterIntegration(twitterConfig, this.logger);
-        await this.integrations.social.twitter.initialize();
+      // Bluesky (replacing Twitter)
+      if (this.config.social && this.config.social.bluesky) {
+        const blueskyConfig = this.config.social.bluesky;
+        this.integrations.social.bluesky = new BlueskyIntegration(blueskyConfig);
+        await this.integrations.social.bluesky.initialize();
       }
       
       // Facebook
@@ -99,6 +101,20 @@ class IntegrationService {
         const facebookConfig = this.config.social.facebook;
         this.integrations.social.facebook = new FacebookIntegration(facebookConfig, this.logger);
         await this.integrations.social.facebook.initialize();
+      }
+      
+      // LinkedIn
+      if (this.config.social && this.config.social.linkedin) {
+        const linkedinConfig = this.config.social.linkedin;
+        this.integrations.social.linkedin = new LinkedInIntegration(linkedinConfig);
+        await this.integrations.social.linkedin.initialize();
+      }
+      
+      // Instagram
+      if (this.config.social && this.config.social.instagram) {
+        const instagramConfig = this.config.social.instagram;
+        this.integrations.social.instagram = new InstagramIntegration(instagramConfig);
+        await this.integrations.social.instagram.initialize();
       }
       
       this.logger.info('Social media integrations initialized');
@@ -351,44 +367,236 @@ class IntegrationService {
   }
 
   /**
-   * Post a thread or multi-part content to Twitter
+   * Post a thread or multi-part content to Bluesky
    * @param {Object} contentData - Content data to post
    * @returns {Object} - Posted thread data
    */
-  async postTwitterThread(contentData) {
+  async postBlueskyThread(contentData) {
     try {
       if (\!this.isInitialized) {
         throw new Error('Integration Service not initialized');
       }
       
-      const twitter = this.integrations.social.twitter;
+      const bluesky = this.integrations.social.bluesky;
       
-      if (\!twitter) {
-        throw new Error('Twitter integration not found');
+      if (\!bluesky) {
+        throw new Error('Bluesky integration not found');
       }
       
-      if (\!twitter.isConnected) {
-        throw new Error('Twitter integration not connected');
+      if (\!bluesky.isInitialized) {
+        throw new Error('Bluesky integration not connected');
       }
       
-      this.logger.info('Posting thread to Twitter');
+      this.logger.info('Posting thread to Bluesky');
       
-      const result = await twitter.publishThread(contentData);
+      // First map content to Bluesky format
+      const blueskyContent = bluesky.mapContentToBluesky(contentData);
       
-      this.logger.info(`Thread posted to Twitter successfully with ${result.threadIds.length} tweets`);
-      
-      return {
-        success: true,
-        platform: 'twitter',
-        threadIds: result.threadIds,
-        url: result.url
-      };
+      // Check the type of content we're posting
+      if (blueskyContent.type === 'thread') {
+        // Handle thread posting
+        let posts = [];
+        
+        if (blueskyContent.firstPost) {
+          // Thread with first post containing an image
+          // Create the first post
+          if (blueskyContent.firstPost.type === 'image') {
+            const firstPostResult = await bluesky.createImagePost({
+              text: blueskyContent.firstPost.text,
+              imageUrl: blueskyContent.firstPost.imageUrl,
+              altText: blueskyContent.firstPost.altText
+            });
+            
+            if (\!firstPostResult) {
+              throw new Error('Failed to create first post in Bluesky thread');
+            }
+            
+            posts.push(firstPostResult);
+            
+            // Create the rest of the thread
+            if (blueskyContent.remainingPosts && blueskyContent.remainingPosts.length > 0) {
+              const threadResults = await bluesky.createThread(blueskyContent.remainingPosts);
+              if (threadResults) {
+                posts = posts.concat(threadResults);
+              }
+            }
+          }
+        } else {
+          // Simple text thread
+          const threadResults = await bluesky.createThread(blueskyContent.posts);
+          if (threadResults) {
+            posts = posts.concat(threadResults);
+          }
+        }
+        
+        this.logger.info(`Thread posted to Bluesky successfully with ${posts.length} posts`);
+        
+        return {
+          success: true,
+          platform: 'bluesky',
+          posts,
+          url: posts.length > 0 ? `https://bsky.app/profile/${bluesky.username}/post/${posts[0].uri.split('/').pop()}` : null
+        };
+      } else if (blueskyContent.type === 'image') {
+        // Single image post
+        const result = await bluesky.createImagePost({
+          text: blueskyContent.text,
+          imageUrl: blueskyContent.imageUrl,
+          altText: blueskyContent.altText
+        });
+        
+        if (\!result) {
+          throw new Error('Failed to create image post on Bluesky');
+        }
+        
+        return {
+          success: true,
+          platform: 'bluesky',
+          posts: [result],
+          url: `https://bsky.app/profile/${bluesky.username}/post/${result.uri.split('/').pop()}`
+        };
+      } else {
+        // Single text post
+        const result = await bluesky.createPost({
+          text: blueskyContent.text
+        });
+        
+        if (\!result) {
+          throw new Error('Failed to create text post on Bluesky');
+        }
+        
+        return {
+          success: true,
+          platform: 'bluesky',
+          posts: [result],
+          url: `https://bsky.app/profile/${bluesky.username}/post/${result.uri.split('/').pop()}`
+        };
+      }
     } catch (error) {
-      this.logger.error('Error posting thread to Twitter:', error);
+      this.logger.error('Error posting to Bluesky:', error);
       
       return {
         success: false,
-        platform: 'twitter',
+        platform: 'bluesky',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Post to LinkedIn
+   * @param {Object} contentData - Content data to post
+   * @returns {Object} - Posted content data
+   */
+  async postToLinkedIn(contentData) {
+    try {
+      if (\!this.isInitialized) {
+        throw new Error('Integration Service not initialized');
+      }
+      
+      const linkedin = this.integrations.social.linkedin;
+      
+      if (\!linkedin) {
+        throw new Error('LinkedIn integration not found');
+      }
+      
+      if (\!linkedin.isInitialized) {
+        throw new Error('LinkedIn integration not connected');
+      }
+      
+      this.logger.info('Posting content to LinkedIn');
+      
+      // Map content to LinkedIn format
+      const linkedinContent = linkedin.mapContentToLinkedIn(contentData);
+      
+      // Check if we need to post with an image
+      let result;
+      if (linkedinContent.imageUrl) {
+        result = await linkedin.createImagePost(linkedinContent);
+      } else {
+        result = await linkedin.createTextPost(linkedinContent);
+      }
+      
+      if (\!result) {
+        throw new Error('Failed to post to LinkedIn');
+      }
+      
+      this.logger.info('Content posted to LinkedIn successfully');
+      
+      return {
+        success: true,
+        platform: 'linkedin',
+        postId: result.id,
+        url: result.url || `https://www.linkedin.com/feed/update/${result.id}`
+      };
+    } catch (error) {
+      this.logger.error('Error posting to LinkedIn:', error);
+      
+      return {
+        success: false,
+        platform: 'linkedin',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Post to Instagram
+   * @param {Object} contentData - Content data to post
+   * @returns {Object} - Posted content data
+   */
+  async postToInstagram(contentData) {
+    try {
+      if (\!this.isInitialized) {
+        throw new Error('Integration Service not initialized');
+      }
+      
+      const instagram = this.integrations.social.instagram;
+      
+      if (\!instagram) {
+        throw new Error('Instagram integration not found');
+      }
+      
+      if (\!instagram.isInitialized) {
+        throw new Error('Instagram integration not connected');
+      }
+      
+      this.logger.info('Posting content to Instagram');
+      
+      // Map content to Instagram format
+      const instagramContent = instagram.mapContentToInstagram(contentData);
+      
+      if (\!instagramContent) {
+        throw new Error('Cannot post to Instagram: Content not suitable (images required)');
+      }
+      
+      let result;
+      if (instagramContent.type === 'carousel') {
+        result = await instagram.createCarouselPost(instagramContent);
+      } else if (instagramContent.type === 'story') {
+        result = await instagram.createStory(instagramContent);
+      } else {
+        result = await instagram.createPost(instagramContent);
+      }
+      
+      if (\!result) {
+        throw new Error('Failed to post to Instagram');
+      }
+      
+      this.logger.info('Content posted to Instagram successfully');
+      
+      return {
+        success: true,
+        platform: 'instagram',
+        mediaId: result,
+        url: `https://www.instagram.com/p/${result}/`
+      };
+    } catch (error) {
+      this.logger.error('Error posting to Instagram:', error);
+      
+      return {
+        success: false,
+        platform: 'instagram',
         error: error.message
       };
     }
@@ -396,7 +604,7 @@ class IntegrationService {
 
   /**
    * Get social media metrics
-   * @param {string} platform - Social platform ('twitter', 'facebook')
+   * @param {string} platform - Social platform ('bluesky', 'facebook', 'linkedin', 'instagram')
    * @param {string} externalId - External post ID
    * @returns {Object} - Social media metrics
    */
@@ -420,12 +628,24 @@ class IntegrationService {
       
       let metrics;
       
-      if (platform.toLowerCase() === 'twitter') {
-        metrics = await integration.getTweetMetrics(externalId);
-      } else if (platform.toLowerCase() === 'facebook') {
-        metrics = await integration.getPostMetrics(externalId);
-      } else {
-        throw new Error(`Unsupported social platform: ${platform}`);
+      switch (platform.toLowerCase()) {
+        case 'bluesky':
+          // Bluesky doesn't have a direct way to get metrics for a single post
+          // So we'll just get the profile metrics instead
+          metrics = await integration.getProfile();
+          break;
+        case 'facebook':
+          metrics = await integration.getPostMetrics(externalId);
+          break;
+        case 'linkedin':
+          // For LinkedIn, we get metrics from the company page
+          metrics = await integration.getAnalytics({ timeRange: 'PAST_30_DAYS' });
+          break;
+        case 'instagram':
+          metrics = await integration.getMediaInsights(externalId);
+          break;
+        default:
+          throw new Error(`Unsupported social platform: ${platform}`);
       }
       
       if (\!metrics) {
