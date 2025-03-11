@@ -1,0 +1,159 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20.x
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Run tests
+      run: npm test
+      env:
+        MONGODB_URI: mongodb://localhost:27017/landing_pad_ai_agents_test
+        NODE_ENV: test
+        JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+    
+    - name: Create build artifact
+      run: |
+        mkdir -p ./dist
+        cp -r ./src ./dist/
+        cp -r ./migrations ./dist/
+        cp -r ./scripts ./dist/
+        cp ./package.json ./dist/
+        cp ./package-lock.json ./dist/
+        
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-build
+        path: ./dist
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment: staging
+    
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: app-build
+        path: ./dist
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Deploy to Elastic Beanstalk
+      run: |
+        cd ./dist
+        zip -r deploy.zip .
+        aws s3 cp deploy.zip s3://${{ secrets.AWS_S3_BUCKET }}/landing-pad-ai-agents/staging/deploy-${{ github.sha }}.zip
+        aws elasticbeanstalk create-application-version \
+          --application-name landing-pad-ai-agents \
+          --version-label ${{ github.sha }} \
+          --source-bundle S3Bucket="${{ secrets.AWS_S3_BUCKET }}",S3Key="landing-pad-ai-agents/staging/deploy-${{ github.sha }}.zip"
+        aws elasticbeanstalk update-environment \
+          --environment-name landing-pad-ai-agents-staging \
+          --version-label ${{ github.sha }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+    
+    - name: Run database migrations
+      run: |
+        cd ./dist
+        npm ci
+        npm run migrate:up
+      env:
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        NODE_ENV: staging
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [build, deploy-staging]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment: production
+    
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: app-build
+        path: ./dist
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Deploy to Elastic Beanstalk
+      run: |
+        cd ./dist
+        zip -r deploy.zip .
+        aws s3 cp deploy.zip s3://${{ secrets.AWS_S3_BUCKET }}/landing-pad-ai-agents/production/deploy-${{ github.sha }}.zip
+        aws elasticbeanstalk create-application-version \
+          --application-name landing-pad-ai-agents \
+          --version-label ${{ github.sha }} \
+          --source-bundle S3Bucket="${{ secrets.AWS_S3_BUCKET }}",S3Key="landing-pad-ai-agents/production/deploy-${{ github.sha }}.zip"
+        aws elasticbeanstalk update-environment \
+          --environment-name landing-pad-ai-agents-production \
+          --version-label ${{ github.sha }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+    
+    - name: Run database migrations
+      run: |
+        cd ./dist
+        npm ci
+        npm run migrate:up
+      env:
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        NODE_ENV: production
