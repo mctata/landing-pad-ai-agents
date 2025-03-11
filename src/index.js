@@ -15,6 +15,13 @@ const { createLogger, format, transports } = require('winston');
 const { MongoClient } = require('mongodb');
 const amqp = require('amqplib');
 
+// Import core infrastructure
+const { getInstance: getMessageBus } = require('./core/messaging/messageBus');
+const { getInstance: getCoordinationService } = require('./core/coordination/coordinationService');
+const { getInstance: getSharedDataStore } = require('./core/data/sharedDataStore');
+const { getInstance: getErrorHandlingService } = require('./core/error');
+const { withErrorHandling } = require('./core/error');
+
 // Import agent classes
 const ContentStrategyAgent = require('./agents/content_strategy');
 const ContentCreationAgent = require('./agents/content_creation');
@@ -45,7 +52,8 @@ const logger = createLogger({
 // Log system startup
 logger.info('Starting Landing Pad Digital AI Agent System');
 
-// Agent instances
+// Service and agent instances
+let services = {};
 let agents = {};
 
 // Initialize services and agents
@@ -55,33 +63,39 @@ async function initialize() {
     const config = await ConfigLoader.load();
     logger.info('Configuration loaded successfully');
     
-    // Connect to MongoDB
-    const mongoClient = new MongoClient(process.env.MONGODB_URI);
-    await mongoClient.connect();
-    logger.info('Connected to MongoDB');
+    // Initialize core infrastructure
+    services.messageBus = await getMessageBus();
+    logger.info('Message Bus initialized');
     
-    const db = mongoClient.db();
+    services.sharedDataStore = await getSharedDataStore();
+    logger.info('Shared Data Store initialized');
+    
+    services.errorHandling = await getErrorHandlingService();
+    logger.info('Error Handling Service initialized');
+    
+    services.coordinationService = await getCoordinationService();
+    logger.info('Coordination Service initialized');
+    
+    // Initialize MongoDB and database service
+    const DatabaseService = require('./common/services/databaseService');
+    
+    // Configure database
+    const dbConfig = {
+      uri: process.env.MONGODB_URI,
+      database: process.env.MONGODB_DATABASE || 'landing_pad_ai_agents'
+    };
+    
+    // Initialize database service
+    services.database = new DatabaseService(dbConfig, logger);
+    await services.database.connect();
+    logger.info('Connected to MongoDB and database service initialized');
     
     // Initialize storage service
-    const storage = new StorageService(db);
+    services.storage = new StorageService(services.database.models);
     logger.info('Storage service initialized');
     
-    // Connect to RabbitMQ
-    const messagingConnection = await amqp.connect({
-      hostname: process.env.RABBITMQ_HOST || 'localhost',
-      port: process.env.RABBITMQ_PORT || 5672,
-      username: process.env.RABBITMQ_USERNAME || 'guest',
-      password: process.env.RABBITMQ_PASSWORD || 'guest'
-    });
-    logger.info('Connected to RabbitMQ');
-    
-    // Initialize messaging service
-    const messaging = new MessagingService(messagingConnection, logger);
-    await messaging.initialize();
-    logger.info('Messaging service initialized');
-    
     // Initialize AI provider service
-    const aiProvider = new AIProviderService({
+    services.aiProvider = new AIProviderService({
       openai: {
         apiKey: process.env.OPENAI_API_KEY,
         organization: process.env.OPENAI_ORG_ID
@@ -96,42 +110,42 @@ async function initialize() {
     agents = {
       contentStrategy: new ContentStrategyAgent(
         config.agents.content_strategy,
-        messaging,
-        storage,
+        services.messageBus,
+        services.storage,
         logger.child({ agent: 'content_strategy' }),
-        aiProvider
+        services.aiProvider
       ),
       
       contentCreation: new ContentCreationAgent(
         config.agents.content_creation,
-        messaging,
-        storage,
+        services.messageBus,
+        services.storage,
         logger.child({ agent: 'content_creation' }),
-        aiProvider
+        services.aiProvider
       ),
       
       contentManagement: new ContentManagementAgent(
         config.agents.content_management,
-        messaging,
-        storage,
+        services.messageBus,
+        services.storage,
         logger.child({ agent: 'content_management' }),
-        aiProvider
+        services.aiProvider
       ),
       
       optimisation: new OptimisationAgent(
         config.agents.optimisation,
-        messaging,
-        storage,
+        services.messageBus,
+        services.storage,
         logger.child({ agent: 'optimisation' }),
-        aiProvider
+        services.aiProvider
       ),
       
       brandConsistency: new BrandConsistencyAgent(
         config.agents.brand_consistency,
-        messaging,
-        storage,
+        services.messageBus,
+        services.storage,
         logger.child({ agent: 'brand_consistency' }),
-        aiProvider
+        services.aiProvider
       )
     };
     
@@ -153,7 +167,7 @@ async function initialize() {
     logger.info('Landing Pad Digital AI Agent System initialized successfully');
     
     // Setup graceful shutdown
-    setupGracefulShutdown(mongoClient, messagingConnection);
+    setupGracefulShutdown(mongoClient);
     
   } catch (error) {
     logger.error('Error initializing system:', error);
@@ -178,21 +192,30 @@ function initializeWebServer() {
     }
   }));
   
+  // Make agent container available to API routes
+  app.locals.agentContainer = {
+    agents,
+    storage: services.storage,
+    messaging: services.messageBus,
+    aiProvider: services.aiProvider,
+    logger
+  };
+  
   // Static files for admin interface
   app.use('/admin', express.static('public/admin'));
   
   // API routes
   app.use('/api', require('./api/routes'));
   
-  // Error handler
-  app.use((err, req, res, next) => {
-    logger.error('API error:', err);
-    res.status(err.status || 500).json({
-      error: {
-        message: err.message || 'Internal Server Error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-      }
+  // Global error handler using our error handling service
+  app.use(async (err, req, res, next) => {
+    const errorResponse = await services.errorHandling.handleError(err, {
+      source: 'api',
+      path: req.path,
+      method: req.method
     });
+    
+    res.status(err.status || 500).json(errorResponse);
   });
   
   // Start server
@@ -202,7 +225,7 @@ function initializeWebServer() {
 }
 
 // Set up graceful shutdown
-function setupGracefulShutdown(mongoClient, messagingConnection) {
+function setupGracefulShutdown(mongoClient) {
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
     
@@ -216,20 +239,44 @@ function setupGracefulShutdown(mongoClient, messagingConnection) {
       }
     }
     
-    // Close database connection
-    try {
-      await mongoClient.close();
-      logger.info('MongoDB connection closed');
-    } catch (error) {
-      logger.error('Error closing MongoDB connection:', error);
+    // Close coordination service
+    if (services.coordinationService) {
+      try {
+        await services.coordinationService.shutdown();
+        logger.info('Coordination service shut down');
+      } catch (error) {
+        logger.error('Error shutting down coordination service:', error);
+      }
     }
     
-    // Close messaging connection
-    try {
-      await messagingConnection.close();
-      logger.info('RabbitMQ connection closed');
-    } catch (error) {
-      logger.error('Error closing RabbitMQ connection:', error);
+    // Close message bus connection
+    if (services.messageBus) {
+      try {
+        await services.messageBus.close();
+        logger.info('Message bus connection closed');
+      } catch (error) {
+        logger.error('Error closing message bus connection:', error);
+      }
+    }
+    
+    // Close shared data store connection
+    if (services.sharedDataStore) {
+      try {
+        await services.sharedDataStore.close();
+        logger.info('Shared data store connection closed');
+      } catch (error) {
+        logger.error('Error closing shared data store connection:', error);
+      }
+    }
+    
+    // Close database connection
+    if (services.database) {
+      try {
+        await services.database.disconnect();
+        logger.info('Database service disconnected');
+      } catch (error) {
+        logger.error('Error disconnecting database service:', error);
+      }
     }
     
     logger.info('Shutdown complete');
@@ -240,17 +287,32 @@ function setupGracefulShutdown(mongoClient, messagingConnection) {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
   
-  // Handle uncaught exceptions and unhandled rejections
-  process.on('uncaughtException', (error) => {
-    logger.error('Uncaught exception:', error);
+  // Handle uncaught exceptions and unhandled rejections using our error handling service
+  process.on('uncaughtException', async (error) => {
+    try {
+      await services.errorHandling.handleError(error, { source: 'uncaughtException' });
+    } catch (handlingError) {
+      logger.error('Error handling uncaught exception:', handlingError);
+    }
     shutdown('uncaughtException');
   });
   
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+  process.on('unhandledRejection', async (reason, promise) => {
+    try {
+      await services.errorHandling.handleError(reason, { 
+        source: 'unhandledRejection',
+        promise: promise.toString()
+      });
+    } catch (handlingError) {
+      logger.error('Error handling unhandled rejection:', handlingError);
+    }
     shutdown('unhandledRejection');
   });
 }
 
-// Start the system
-initialize();
+// Start the system using error handling wrapper
+const safeInitialize = withErrorHandling(initialize, {
+  context: { operation: 'system_startup' }
+});
+
+safeInitialize();
