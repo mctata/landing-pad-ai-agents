@@ -3,11 +3,17 @@
  * 
  * This script initializes the MongoDB database with the necessary collections,
  * indices, and default data for the AI agent system using Mongoose models.
+ * 
+ * It also applies any pending migrations to ensure the database schema is up to date.
  */
 
 require('dotenv').config();
 const mongoose = require('mongoose');
 const models = require('../src/models');
+const MigrationService = require('../src/common/services/migrationService');
+
+// Initialize the migration service
+const migrationService = new MigrationService();
 
 // Get MongoDB connection string from environment variables
 const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/landing_pad_ai_agents';
@@ -251,6 +257,25 @@ async function initializeDatabase() {
     });
     console.log('Connected to MongoDB successfully');
     
+    // Apply any pending migrations
+    console.log('Checking for pending migrations...');
+    await migrationService.initialize();
+    const migrationStatus = await migrationService.status();
+    const pendingMigrations = migrationStatus.filter(m => !m.appliedAt);
+    
+    if (pendingMigrations.length > 0) {
+      console.log(`Found ${pendingMigrations.length} pending migrations. Applying...`);
+      const appliedMigrations = await migrationService.up();
+      
+      if (appliedMigrations.length > 0) {
+        console.log(`Successfully applied ${appliedMigrations.length} migrations: ${appliedMigrations.join(', ')}`);
+      } else {
+        console.log('No migrations were applied. This may indicate an issue with the migration process.');
+      }
+    } else {
+      console.log('No pending migrations found. Database schema is up to date.');
+    }
+    
     // Insert default agents
     console.log('Checking if agents collection has data...');
     const agentCount = await models.Agent.countDocuments();
@@ -292,9 +317,14 @@ async function initializeDatabase() {
     console.error('Database initialization failed:', error);
     process.exit(1);
   } finally {
-    // Close the connection
+    // Close the migration service
+    if (migrationService) {
+      await migrationService.close();
+    }
+    
+    // Close the mongoose connection
     await mongoose.connection.close();
-    console.log('Database connection closed');
+    console.log('Database connections closed');
   }
 }
 

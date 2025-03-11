@@ -14,7 +14,11 @@
     "agent:management": "node src/cli/agent-commands.js content_management",
     "agent:optimisation": "node src/cli/agent-commands.js optimisation",
     "agent:brand": "node src/cli/agent-commands.js brand_consistency",
-    "monitor": "node examples/agent-health-integration.js"
+    "monitor": "node examples/agent-health-integration.js",
+    "migrate:status": "node src/cli/migration-commands.js status",
+    "migrate:up": "node src/cli/migration-commands.js up",
+    "migrate:down": "node src/cli/migration-commands.js down",
+    "migrate:create": "node src/cli/migration-commands.js create"
   },
   "repository": {
     "type": "git",
@@ -46,6 +50,7 @@
     "helmet": "^7.1.0",
     "joi": "^17.12.2",
     "jsonwebtoken": "^9.0.2",
+    "migrate-mongo": "^12.1.3",
     "mongodb": "^6.4.0",
     "mongoose": "^8.12.1",
     "morgan": "^1.10.0",
