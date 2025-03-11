@@ -1,192 +1,154 @@
 /**
- * Test Helpers for Landing Pad AI Agents
+ * Test Helpers
  * 
- * This file contains utility functions to help with testing.
+ * Utility functions and factories for testing.
  */
 
 const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const { createServer } = require('http');
+const { v4: uuidv4 } = require('uuid');
 
-/**
- * MongoDB Memory Server instance for test database
- */
-let mongoServer;
-
-/**
- * Connect to a MongoDB memory server for testing
- * @returns {Promise<string>} Connection URI
- */
-async function connectToTestDatabase() {
-  try {
-    // Create MongoDB memory server if it doesn't exist
-    if (!mongoServer) {
-      mongoServer = await MongoMemoryServer.create();
-    }
+// Factory functions to create test data
+const mockFactories = {
+  /**
+   * Create a mock user
+   */
+  createUser: (overrides = {}) => {
+    return {
+      _id: overrides._id || new mongoose.Types.ObjectId(),
+      email: overrides.email || `test.user.${uuidv4().substring(0, 8)}@example.com`,
+      firstName: overrides.firstName || 'Test',
+      lastName: overrides.lastName || 'User',
+      role: overrides.role || 'user',
+      password: overrides.password || 'password123',
+      createdAt: overrides.createdAt || new Date(),
+      updatedAt: overrides.updatedAt || new Date(),
+      ...overrides
+    };
+  },
+  
+  /**
+   * Create a mock agent
+   */
+  createAgent: (overrides = {}) => {
+    const id = overrides.id || uuidv4();
+    const type = overrides.type || 'content_creation';
     
-    // Get connection string
-    const mongoUri = mongoServer.getUri();
+    return {
+      _id: overrides._id || new mongoose.Types.ObjectId(),
+      id,
+      name: overrides.name || `${type}-agent-${id.substring(0, 8)}`,
+      type,
+      description: overrides.description || `Test ${type} agent`,
+      status: overrides.status || 'active',
+      modules: overrides.modules || ['blog-generator', 'social-media-generator'],
+      configuration: overrides.configuration || {},
+      createdAt: overrides.createdAt || new Date(),
+      updatedAt: overrides.updatedAt || new Date(),
+      ...overrides
+    };
+  },
+  
+  /**
+   * Create a mock content item
+   */
+  createContent: (overrides = {}) => {
+    const id = overrides.id || uuidv4();
+    const title = overrides.title || `Test Content ${id.substring(0, 8)}`;
     
-    // Connect to the in-memory database
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    return {
+      _id: overrides._id || new mongoose.Types.ObjectId(),
+      id,
+      title,
+      slug: overrides.slug || title.toLowerCase().replace(/\s+/g, '-'),
+      type: overrides.type || 'blog',
+      status: overrides.status || 'draft',
+      body: overrides.body || 'Test content body',
+      metadata: overrides.metadata || {},
+      author: overrides.author || mockFactories.createUser()._id,
+      createdAt: overrides.createdAt || new Date(),
+      updatedAt: overrides.updatedAt || new Date(),
+      ...overrides
+    };
+  },
+  
+  /**
+   * Create a mock workflow
+   */
+  createWorkflow: (overrides = {}) => {
+    const id = overrides.id || uuidv4();
     
-    return mongoUri;
-  } catch (error) {
-    console.error('Error connecting to test database:', error);
-    throw error;
+    return {
+      _id: overrides._id || new mongoose.Types.ObjectId(),
+      id,
+      name: overrides.name || `Test Workflow ${id.substring(0, 8)}`,
+      description: overrides.description || 'Test workflow description',
+      status: overrides.status || 'active',
+      steps: overrides.steps || [
+        {
+          id: 'step1',
+          name: 'Generate Content',
+          agent: 'content_creation',
+          module: 'blog-generator',
+          config: {}
+        },
+        {
+          id: 'step2',
+          name: 'Optimize Content',
+          agent: 'optimisation',
+          module: 'seo-optimizer',
+          config: {}
+        }
+      ],
+      createdAt: overrides.createdAt || new Date(),
+      updatedAt: overrides.updatedAt || new Date(),
+      ...overrides
+    };
+  },
+  
+  /**
+   * Create a mock brief
+   */
+  createBrief: (overrides = {}) => {
+    const id = overrides.id || uuidv4();
+    
+    return {
+      _id: overrides._id || new mongoose.Types.ObjectId(),
+      id,
+      title: overrides.title || `Test Brief ${id.substring(0, 8)}`,
+      description: overrides.description || 'Test brief description',
+      contentType: overrides.contentType || 'blog',
+      keywords: overrides.keywords || ['test', 'brief', 'keywords'],
+      targetAudience: overrides.targetAudience || 'Test audience',
+      tone: overrides.tone || 'professional',
+      requestor: overrides.requestor || mockFactories.createUser()._id,
+      status: overrides.status || 'pending',
+      createdAt: overrides.createdAt || new Date(),
+      updatedAt: overrides.updatedAt || new Date(),
+      ...overrides
+    };
+  },
+  
+  /**
+   * Create mock metrics
+   */
+  createMetrics: (overrides = {}) => {
+    return {
+      _id: overrides._id || new mongoose.Types.ObjectId(),
+      contentId: overrides.contentId || mockFactories.createContent()._id,
+      views: overrides.views || Math.floor(Math.random() * 1000),
+      shares: overrides.shares || Math.floor(Math.random() * 100),
+      comments: overrides.comments || Math.floor(Math.random() * 50),
+      conversionRate: overrides.conversionRate || Math.random() * 10,
+      engagementRate: overrides.engagementRate || Math.random() * 20,
+      timePeriod: overrides.timePeriod || {
+        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        end: new Date()
+      },
+      createdAt: overrides.createdAt || new Date(),
+      updatedAt: overrides.updatedAt || new Date(),
+      ...overrides
+    };
   }
-}
-
-/**
- * Close connection to test database
- * @returns {Promise<void>}
- */
-async function closeTestDatabase() {
-  try {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    
-    if (mongoServer) {
-      await mongoServer.stop();
-      mongoServer = null;
-    }
-  } catch (error) {
-    console.error('Error closing test database:', error);
-    throw error;
-  }
-}
-
-/**
- * Generate a JWT token for testing
- * @param {Object} payload - Token payload
- * @returns {string} JWT token
- */
-function generateTestToken(payload = {}) {
-  const defaultPayload = {
-    sub: 'test-user',
-    roles: ['user'],
-    ...payload
-  };
-  
-  return jwt.sign(defaultPayload, process.env.JWT_SECRET || 'test-jwt-secret', { expiresIn: '1h' });
-}
-
-/**
- * Create HTTP server with Express app for API testing
- * @param {Express} app - Express application
- * @returns {Object} - Server and cleanup function
- */
-function createTestServer(app) {
-  const server = createServer(app);
-  
-  // Start server on random port
-  return new Promise((resolve) => {
-    server.listen(0, () => {
-      const port = server.address().port;
-      const baseUrl = `http://localhost:${port}`;
-      
-      resolve({
-        server,
-        baseUrl,
-        close: () => new Promise(resolve => server.close(resolve))
-      });
-    });
-  });
-}
-
-/**
- * Create a test agent for API testing
- * @param {Object} data - Agent data
- * @returns {Object} Agent object
- */
-async function createTestAgent(data = {}) {
-  const { Agent } = mongoose.models;
-  
-  const defaultData = {
-    agentId: `test-agent-${Date.now()}`,
-    name: 'Test Agent',
-    description: 'Agent created for testing',
-    status: 'active',
-    type: 'test',
-    modules: [
-      {
-        name: 'test-module',
-        description: 'Test module',
-        enabled: true
-      }
-    ],
-    createdBy: 'system'
-  };
-  
-  return await Agent.create({ ...defaultData, ...data });
-}
-
-/**
- * Create a test user for API testing
- * @param {Object} data - User data
- * @returns {Object} User object
- */
-async function createTestUser(data = {}) {
-  const { User } = mongoose.models;
-  
-  const defaultData = {
-    userId: `test-user-${Date.now()}`,
-    firstName: 'Test',
-    lastName: 'User',
-    email: `test-${Date.now()}@example.com`,
-    password: 'password123',
-    roles: ['user'],
-    status: 'active',
-    createdBy: 'system'
-  };
-  
-  return await User.create({ ...defaultData, ...data });
-}
-
-/**
- * Create test content for API testing
- * @param {Object} data - Content data
- * @returns {Object} Content object
- */
-async function createTestContent(data = {}) {
-  const { Content } = mongoose.models;
-  
-  const defaultData = {
-    contentId: `test-content-${Date.now()}`,
-    title: 'Test Content',
-    contentType: 'blog',
-    content: 'This is test content',
-    status: 'draft',
-    workflowStatus: 'created',
-    author: 'test-user',
-    keywords: ['test', 'content'],
-    categories: ['test'],
-    createdBy: 'system'
-  };
-  
-  return await Content.create({ ...defaultData, ...data });
-}
-
-/**
- * Wait for a specified time
- * @param {number} ms - Milliseconds to wait
- * @returns {Promise<void>}
- */
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-module.exports = {
-  connectToTestDatabase,
-  closeTestDatabase,
-  generateTestToken,
-  createTestServer,
-  createTestAgent,
-  createTestUser,
-  createTestContent,
-  wait
 };
+
+module.exports = { mockFactories };

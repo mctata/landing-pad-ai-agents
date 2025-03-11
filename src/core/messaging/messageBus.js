@@ -8,198 +8,28 @@ class MessageBus {
     this.connection = null;
     this.channel = null;
     this.isConnected = false;
-    this.retryCount = 0;
-    this.maxRetries = config.messageBus?.maxRetries || 5;
-    this.retryDelay = config.messageBus?.retryDelay || 5000; // 5 seconds
-    this.exchanges = {
-      commands: 'landing_pad.commands',
-      events: 'landing_pad.events',
-      queries: 'landing_pad.queries'
-    };
+    this.subscriptions = new Map();
   }
 
   async connect() {
     try {
-      this.connection = await amqp.connect(config.messageBus?.url || 'amqp://localhost:5672');
+      // Connect to RabbitMQ
+      this.connection = await amqp.connect(config.messaging.uri);
       this.channel = await this.connection.createChannel();
       
-      // Setup exchanges
-      await this.channel.assertExchange(this.exchanges.commands, 'topic', { durable: true });
-      await this.channel.assertExchange(this.exchanges.events, 'topic', { durable: true });
-      await this.channel.assertExchange(this.exchanges.queries, 'topic', { durable: true });
+      // Create exchanges
+      await this.channel.assertExchange(config.messaging.exchanges.commands, 'direct', { durable: true });
+      await this.channel.assertExchange(config.messaging.exchanges.events, 'topic', { durable: true });
       
-      // Setup dead letter exchange
-      await this.channel.assertExchange('landing_pad.dead_letter', 'fanout', { durable: true });
-      
-      // Handle connection events
-      this.connection.on('error', (err) => {
-        logger.error('RabbitMQ connection error', err);
-        this.retryConnection();
-      });
-      
-      this.connection.on('close', () => {
-        logger.warn('RabbitMQ connection closed');
-        this.isConnected = false;
-        this.retryConnection();
-      });
-      
+      // Set isConnected flag
       this.isConnected = true;
-      this.retryCount = 0;
-      logger.info('Successfully connected to RabbitMQ');
       
+      logger.info('MessageBus connected successfully');
       return this;
     } catch (error) {
-      logger.error('Failed to connect to RabbitMQ', error);
-      this.retryConnection();
+      logger.error('Failed to connect to message broker', error);
       throw error;
     }
-  }
-
-  async retryConnection() {
-    if (this.retryCount >= this.maxRetries) {
-      logger.error(`Failed to reconnect to RabbitMQ after ${this.maxRetries} attempts`);
-      return;
-    }
-    
-    this.retryCount++;
-    logger.info(`Attempting to reconnect to RabbitMQ (${this.retryCount}/${this.maxRetries})...`);
-    
-    setTimeout(async () => {
-      try {
-        await this.connect();
-      } catch (error) {
-        // Error is already logged in connect()
-      }
-    }, this.retryDelay);
-  }
-
-  async publishCommand(routingKey, data, options = {}) {
-    return this.publish(this.exchanges.commands, routingKey, data, options);
-  }
-
-  async publishEvent(routingKey, data, options = {}) {
-    return this.publish(this.exchanges.events, routingKey, data, options);
-  }
-
-  async publishQuery(routingKey, data, options = {}) {
-    return this.publish(this.exchanges.queries, routingKey, data, options);
-  }
-
-  async publish(exchange, routingKey, data, options = {}) {
-    if (!this.isConnected) {
-      throw new Error('Cannot publish message: MessageBus not connected');
-    }
-    
-    try {
-      const message = Buffer.from(JSON.stringify({
-        data,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          messageId: options.messageId || this.generateId(),
-          correlationId: options.correlationId,
-          source: options.source || 'system',
-          ...options.metadata
-        }
-      }));
-      
-      const publishOptions = {
-        persistent: true,
-        ...options
-      };
-      
-      return this.channel.publish(exchange, routingKey, message, publishOptions);
-    } catch (error) {
-      logger.error(`Failed to publish message to ${exchange} with routing key ${routingKey}`, error);
-      throw error;
-    }
-  }
-
-  async subscribe(exchange, routingKey, handler, options = {}) {
-    if (!this.isConnected) {
-      throw new Error('Cannot subscribe: MessageBus not connected');
-    }
-    
-    try {
-      // Create a queue with a generated name or use provided name
-      const queueName = options.queueName || '';
-      const { queue } = await this.channel.assertQueue(queueName, {
-        durable: true,
-        deadLetterExchange: 'landing_pad.dead_letter',
-        ...options.queueOptions
-      });
-      
-      // Bind the queue to the exchange with the routing key
-      await this.channel.bindQueue(queue, exchange, routingKey);
-      
-      // Set prefetch if provided
-      if (options.prefetch) {
-        await this.channel.prefetch(options.prefetch);
-      }
-      
-      // Start consuming messages
-      await this.channel.consume(queue, async (msg) => {
-        if (!msg) return;
-        
-        try {
-          const content = JSON.parse(msg.content.toString());
-          
-          // Process the message with the handler
-          await handler(content.data, content.metadata, msg);
-          
-          // Acknowledge the message
-          this.channel.ack(msg);
-        } catch (error) {
-          logger.error(`Error processing message from ${queue}`, error);
-          
-          // Handle retry logic
-          const retryCount = (msg.properties.headers['x-retry-count'] || 0) + 1;
-          
-          if (retryCount <= (options.maxRetries || 3)) {
-            // Republish with incremented retry count
-            const retryMessage = msg.content;
-            
-            this.channel.publish(exchange, routingKey, retryMessage, {
-              headers: {
-                'x-retry-count': retryCount,
-                'x-original-exchange': exchange,
-                'x-original-routing-key': routingKey
-              }
-            });
-            
-            // Acknowledge the original message
-            this.channel.ack(msg);
-          } else {
-            // Send to dead letter queue when max retries exceeded
-            this.channel.reject(msg, false);
-          }
-        }
-      }, { noAck: false });
-      
-      logger.info(`Subscribed to ${exchange} with routing key ${routingKey} on queue ${queue}`);
-      
-      return {
-        queueName: queue,
-        unsubscribe: async () => {
-          await this.channel.cancel(queue);
-          logger.info(`Unsubscribed from queue ${queue}`);
-        }
-      };
-    } catch (error) {
-      logger.error(`Failed to subscribe to ${exchange} with routing key ${routingKey}`, error);
-      throw error;
-    }
-  }
-
-  async subscribeToCommand(routingKey, handler, options = {}) {
-    return this.subscribe(this.exchanges.commands, routingKey, handler, options);
-  }
-
-  async subscribeToEvent(routingKey, handler, options = {}) {
-    return this.subscribe(this.exchanges.events, routingKey, handler, options);
-  }
-
-  async subscribeToQuery(routingKey, handler, options = {}) {
-    return this.subscribe(this.exchanges.queries, routingKey, handler, options);
   }
 
   async close() {
@@ -212,23 +42,159 @@ class MessageBus {
     }
     
     this.isConnected = false;
-    logger.info('Disconnected from RabbitMQ');
+    logger.info('MessageBus connection closed');
   }
 
-  generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  async publishCommand(routingKey, data) {
+    if (!this.isConnected) {
+      throw new Error('MessageBus not connected');
+    }
+    
+    try {
+      const success = this.channel.publish(
+        config.messaging.exchanges.commands,
+        routingKey,
+        Buffer.from(JSON.stringify(data)),
+        { persistent: true }
+      );
+      
+      logger.debug(`Published command to ${routingKey}`, { success });
+      return success;
+    } catch (error) {
+      logger.error(`Failed to publish command to ${routingKey}`, error);
+      throw error;
+    }
+  }
+
+  async publishEvent(routingKey, data) {
+    if (!this.isConnected) {
+      throw new Error('MessageBus not connected');
+    }
+    
+    try {
+      const success = this.channel.publish(
+        config.messaging.exchanges.events,
+        routingKey,
+        Buffer.from(JSON.stringify(data)),
+        { persistent: true }
+      );
+      
+      logger.debug(`Published event to ${routingKey}`, { success });
+      return success;
+    } catch (error) {
+      logger.error(`Failed to publish event to ${routingKey}`, error);
+      throw error;
+    }
+  }
+
+  async subscribeToCommand(routingKey, handler) {
+    if (!this.isConnected) {
+      throw new Error('MessageBus not connected');
+    }
+    
+    try {
+      // Create queue
+      const { queue } = await this.channel.assertQueue('', { exclusive: true });
+      
+      // Bind queue to exchange with routing key
+      await this.channel.bindQueue(queue, config.messaging.exchanges.commands, routingKey);
+      
+      // Consume messages
+      const consumer = await this.channel.consume(queue, async (msg) => {
+        if (!msg) return;
+        
+        try {
+          const data = JSON.parse(msg.content.toString());
+          await handler(data, { 
+            type: routingKey, 
+            timestamp: new Date(msg.properties.timestamp),
+            messageId: msg.properties.messageId
+          });
+          
+          this.channel.ack(msg);
+        } catch (error) {
+          logger.error(`Error handling command ${routingKey}`, error);
+          this.channel.nack(msg);
+        }
+      });
+      
+      // Store subscription
+      this.subscriptions.set(`command:${routingKey}`, { queue, consumer });
+      
+      logger.info(`Subscribed to command ${routingKey}`);
+      return { queue, consumer };
+    } catch (error) {
+      logger.error(`Failed to subscribe to command ${routingKey}`, error);
+      throw error;
+    }
+  }
+
+  async subscribeToEvent(pattern, handler) {
+    if (!this.isConnected) {
+      throw new Error('MessageBus not connected');
+    }
+    
+    try {
+      // Create queue
+      const { queue } = await this.channel.assertQueue('', { exclusive: true });
+      
+      // Bind queue to exchange with pattern
+      await this.channel.bindQueue(queue, config.messaging.exchanges.events, pattern);
+      
+      // Consume messages
+      const consumer = await this.channel.consume(queue, async (msg) => {
+        if (!msg) return;
+        
+        try {
+          const data = JSON.parse(msg.content.toString());
+          await handler(data, { 
+            type: msg.fields.routingKey, 
+            timestamp: new Date(msg.properties.timestamp),
+            messageId: msg.properties.messageId
+          });
+          
+          this.channel.ack(msg);
+        } catch (error) {
+          logger.error(`Error handling event ${pattern}`, error);
+          this.channel.nack(msg);
+        }
+      });
+      
+      // Store subscription
+      this.subscriptions.set(`event:${pattern}`, { queue, consumer });
+      
+      logger.info(`Subscribed to event pattern ${pattern}`);
+      return { queue, consumer };
+    } catch (error) {
+      logger.error(`Failed to subscribe to event pattern ${pattern}`, error);
+      throw error;
+    }
+  }
+
+  async unsubscribe(type, key) {
+    const subscriptionKey = `${type}:${key}`;
+    
+    if (this.subscriptions.has(subscriptionKey)) {
+      const { consumer } = this.subscriptions.get(subscriptionKey);
+      await this.channel.cancel(consumer.consumerTag);
+      this.subscriptions.delete(subscriptionKey);
+      
+      logger.info(`Unsubscribed from ${subscriptionKey}`);
+      return true;
+    }
+    
+    return false;
   }
 }
 
 // Singleton instance
 let messageBusInstance = null;
 
-module.exports = {
-  getInstance: async () => {
-    if (!messageBusInstance) {
-      messageBusInstance = new MessageBus();
-      await messageBusInstance.connect();
-    }
-    return messageBusInstance;
+module.exports.getInstance = async () => {
+  if (!messageBusInstance) {
+    messageBusInstance = new MessageBus();
+    await messageBusInstance.connect();
   }
+  
+  return messageBusInstance;
 };
