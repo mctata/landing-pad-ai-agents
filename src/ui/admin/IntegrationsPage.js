@@ -3,14 +3,15 @@ import {
   Box, Typography, Paper, Grid, Card, CardContent, 
   CardActions, Button, Chip, CircularProgress, 
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, FormControlLabel, Switch
+  TextField, FormControlLabel, Switch, Alert, Snackbar
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { integrationService } from '../services/api';
 
-// This would come from your API in a real implementation
-const mockIntegrations = {
+// Fallback data structure in case API fails
+const emptyIntegrations = {
   cms: [
     { 
       id: 'wordpress', 
@@ -114,7 +115,7 @@ const mockIntegrations = {
   ]
 };
 
-function IntegrationCard({ integration, onConfigure }) {
+function IntegrationCard({ integration, onConfigure, onTestConnection, testingConnection }) {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -140,7 +141,7 @@ function IntegrationCard({ integration, onConfigure }) {
         
         {integration.status === 'error' && (
           <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-            {integration.error}
+            {integration.error || 'Connection error. Check your configuration.'}
           </Typography>
         )}
         
@@ -148,13 +149,23 @@ function IntegrationCard({ integration, onConfigure }) {
           Last synchronized: {formatDate(integration.lastSync)}
         </Typography>
       </CardContent>
-      <CardActions>
+      <CardActions sx={{ justifyContent: 'space-between' }}>
         <Button 
           size="small" 
           startIcon={<SettingsIcon />} 
           onClick={() => onConfigure(integration)}
         >
           Configure
+        </Button>
+        
+        <Button 
+          size="small"
+          color="primary"
+          variant="outlined"
+          onClick={() => onTestConnection(integration.id)}
+          disabled={testingConnection}
+        >
+          {testingConnection ? <CircularProgress size={20} /> : 'Test Connection'}
         </Button>
       </CardActions>
     </Card>
@@ -231,19 +242,34 @@ function IntegrationsPage() {
     open: false,
     integration: null
   });
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [testingConnection, setTestingConnection] = useState(false);
+  
+  const fetchIntegrations = async () => {
+    setLoading(true);
+    try {
+      const data = await integrationService.getIntegrations();
+      setIntegrations(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching integrations:', err);
+      setError('Failed to load integrations. Please try again later.');
+      // Use empty structure as fallback
+      setIntegrations(emptyIntegrations);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setIntegrations(mockIntegrations);
-      setLoading(false);
-    }, 1000);
+    fetchIntegrations();
   }, []);
   
   const handleOpenConfig = (integration) => {
     setConfigDialog({
       open: true,
-      integration
+      integration: {...integration}
     });
   };
   
@@ -254,23 +280,77 @@ function IntegrationsPage() {
     });
   };
   
-  const handleSaveConfig = (id, config) => {
-    // This would be an API call in a real implementation
-    console.log('Saving configuration for', id, config);
-    
-    // Update local state
-    const newIntegrations = {...integrations};
-    
-    for (const category of Object.keys(newIntegrations)) {
-      const index = newIntegrations[category].findIndex(i => i.id === id);
-      if (index !== -1) {
-        newIntegrations[category][index].config = config;
-        break;
+  const handleSaveConfig = async (id, config) => {
+    try {
+      // Save to the server
+      await integrationService.updateIntegration(id, config);
+      
+      // Update local state
+      const newIntegrations = {...integrations};
+      
+      for (const category of Object.keys(newIntegrations)) {
+        const index = newIntegrations[category].findIndex(i => i.id === id);
+        if (index !== -1) {
+          newIntegrations[category][index].config = config;
+          break;
+        }
       }
+      
+      setIntegrations(newIntegrations);
+      setSuccessMessage('Integration configuration updated successfully');
+      handleCloseConfig();
+    } catch (err) {
+      console.error('Error updating integration:', err);
+      setError('Failed to update integration configuration. Please try again.');
     }
-    
-    setIntegrations(newIntegrations);
-    handleCloseConfig();
+  };
+  
+  const handleTestConnection = async (integrationId) => {
+    setTestingConnection(true);
+    try {
+      // Call API to test connection
+      const result = await integrationService.testConnection(integrationId);
+      
+      // Update the status in the UI
+      const newIntegrations = {...integrations};
+      
+      for (const category of Object.keys(newIntegrations)) {
+        const index = newIntegrations[category].findIndex(i => i.id === integrationId);
+        if (index !== -1) {
+          newIntegrations[category][index].status = result.success ? 'connected' : 'error';
+          newIntegrations[category][index].lastSync = new Date().toISOString();
+          if (!result.success) {
+            newIntegrations[category][index].error = result.message;
+          }
+          break;
+        }
+      }
+      
+      setIntegrations(newIntegrations);
+      
+      if (result.success) {
+        setSuccessMessage('Connection test successful');
+      } else {
+        setError(`Connection test failed: ${result.message}`);
+      }
+    } catch (err) {
+      console.error('Error testing connection:', err);
+      setError('Connection test failed. Please check your configuration.');
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+  
+  const handleCloseError = () => {
+    setError(null);
+  };
+  
+  const handleCloseSuccess = () => {
+    setSuccessMessage(null);
+  };
+  
+  const handleRefresh = () => {
+    fetchIntegrations();
   };
   
   if (loading) {
@@ -283,9 +363,43 @@ function IntegrationsPage() {
   
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        External Integrations
-      </Typography>
+      {/* Success Message Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={handleCloseSuccess}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSuccess} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      
+      {/* Error Message Snackbar */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={handleCloseError}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseError} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+    
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          External Integrations
+        </Typography>
+        
+        <Button 
+          variant="outlined"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+      </Box>
       
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="h5" component="h2" gutterBottom>
@@ -297,6 +411,8 @@ function IntegrationsPage() {
               <IntegrationCard 
                 integration={integration}
                 onConfigure={handleOpenConfig}
+                onTestConnection={handleTestConnection}
+                testingConnection={testingConnection}
               />
             </Grid>
           ))}
@@ -313,6 +429,8 @@ function IntegrationsPage() {
               <IntegrationCard 
                 integration={integration}
                 onConfigure={handleOpenConfig}
+                onTestConnection={handleTestConnection}
+                testingConnection={testingConnection}
               />
             </Grid>
           ))}
@@ -329,6 +447,8 @@ function IntegrationsPage() {
               <IntegrationCard 
                 integration={integration}
                 onConfigure={handleOpenConfig}
+                onTestConnection={handleTestConnection}
+                testingConnection={testingConnection}
               />
             </Grid>
           ))}

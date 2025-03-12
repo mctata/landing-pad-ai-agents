@@ -5,7 +5,7 @@ import {
   InputLabel, Select, MenuItem, IconButton, Divider, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Tabs, Tab
+  Tabs, Tab, Alert, Snackbar
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,71 +13,9 @@ import PublishIcon from '@mui/icons-material/Publish';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import { contentService, integrationService } from '../services/api';
 
-// Mock data - in a real app this would come from your API
-const mockContentItems = [
-  {
-    id: 'c001',
-    title: 'Why AI is Transforming Content Marketing',
-    type: 'blog',
-    status: 'published',
-    author: 'AI Content Agent',
-    created: '2025-03-01T14:30:00Z',
-    updated: '2025-03-10T09:15:00Z',
-    publishDestinations: ['wordpress', 'medium'],
-    tags: ['AI', 'Content Marketing', 'Technology'],
-    snippet: 'Artificial intelligence is revolutionizing how brands create and distribute content. Here's how to leverage AI in your content marketing strategy.'
-  },
-  {
-    id: 'c002',
-    title: 'Spring Sale Landing Page',
-    type: 'landing-page',
-    status: 'draft',
-    author: 'AI Content Agent',
-    created: '2025-03-08T16:45:00Z',
-    updated: '2025-03-09T10:20:00Z',
-    publishDestinations: [],
-    tags: ['ecommerce', 'promotion', 'seasonal'],
-    snippet: 'Limited time spring promotion featuring our most popular products with special discounts and free shipping offers.'
-  },
-  {
-    id: 'c003',
-    title: 'Product Launch Social Media Kit',
-    type: 'social-media',
-    status: 'ready',
-    author: 'AI Content Agent',
-    created: '2025-03-05T11:30:00Z',
-    updated: '2025-03-11T08:45:00Z',
-    publishDestinations: [],
-    tags: ['product-launch', 'social-media', 'marketing'],
-    snippet: 'Complete social media kit including post copy, images, and hashtags for Facebook, Twitter, Instagram and LinkedIn.'
-  },
-  {
-    id: 'c004',
-    title: '10 SEO Tips for 2025',
-    type: 'blog',
-    status: 'published',
-    author: 'AI Content Agent',
-    created: '2025-02-28T09:00:00Z',
-    updated: '2025-03-02T14:30:00Z',
-    publishDestinations: ['wordpress'],
-    tags: ['SEO', 'digital marketing', 'tips'],
-    snippet: 'The latest search engine optimization techniques to improve your website ranking and visibility in 2025.'
-  },
-  {
-    id: 'c005',
-    title: 'Email Newsletter - March Edition',
-    type: 'email',
-    status: 'ready',
-    author: 'AI Content Agent',
-    created: '2025-03-07T15:20:00Z',
-    updated: '2025-03-10T11:05:00Z',
-    publishDestinations: [],
-    tags: ['newsletter', 'email-marketing'],
-    snippet: 'Monthly newsletter featuring product updates, industry news, and special offers for March 2025.'
-  }
-];
-
+// Available content publishing destinations - this will be replaced with data from the API
 const publishDestinations = [
   { id: 'wordpress', name: 'WordPress', type: 'cms', icon: '🌐' },
   { id: 'shopify', name: 'Shopify Blog', type: 'cms', icon: '🛍️' },
@@ -168,10 +106,13 @@ function ContentTable({ items, onEdit, onView, onPublish, onDelete }) {
 
 function PublishDialog({ open, content, destinations, onClose, onPublish }) {
   const [selected, setSelected] = useState([]);
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState(null);
   
   useEffect(() => {
     if (content) {
       setSelected(content.publishDestinations || []);
+      setError(null);
     }
   }, [content]);
   
@@ -183,12 +124,31 @@ function PublishDialog({ open, content, destinations, onClose, onPublish }) {
     }
   };
   
+  const handlePublish = async () => {
+    try {
+      setPublishing(true);
+      setError(null);
+      await onPublish(content.id, selected);
+    } catch (err) {
+      setError('Failed to publish content. Please try again.');
+      console.error('Publish error:', err);
+    } finally {
+      setPublishing(false);
+    }
+  };
+  
   if (!content) return null;
   
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={!publishing ? onClose : undefined} maxWidth="sm" fullWidth>
       <DialogTitle>Publish: {content.title}</DialogTitle>
       <DialogContent>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
         <Typography variant="body2" paragraph>
           Select the platforms where you want to publish this content:
         </Typography>
@@ -204,9 +164,10 @@ function PublishDialog({ open, content, destinations, onClose, onPublish }) {
                 key={dest.id}
                 icon={<Typography fontSize="small">{dest.icon}</Typography>}
                 label={dest.name}
-                onClick={() => handleToggleDestination(dest.id)}
+                onClick={() => !publishing && handleToggleDestination(dest.id)}
                 color={selected.includes(dest.id) ? 'primary' : 'default'}
                 variant={selected.includes(dest.id) ? 'filled' : 'outlined'}
+                disabled={publishing}
               />
             ))
           }
@@ -223,9 +184,10 @@ function PublishDialog({ open, content, destinations, onClose, onPublish }) {
                 key={dest.id}
                 icon={<Typography fontSize="small">{dest.icon}</Typography>}
                 label={dest.name}
-                onClick={() => handleToggleDestination(dest.id)}
+                onClick={() => !publishing && handleToggleDestination(dest.id)}
                 color={selected.includes(dest.id) ? 'primary' : 'default'}
                 variant={selected.includes(dest.id) ? 'filled' : 'outlined'}
+                disabled={publishing}
               />
             ))
           }
@@ -242,23 +204,24 @@ function PublishDialog({ open, content, destinations, onClose, onPublish }) {
                 key={dest.id}
                 icon={<Typography fontSize="small">{dest.icon}</Typography>}
                 label={dest.name}
-                onClick={() => handleToggleDestination(dest.id)}
+                onClick={() => !publishing && handleToggleDestination(dest.id)}
                 color={selected.includes(dest.id) ? 'primary' : 'default'}
                 variant={selected.includes(dest.id) ? 'filled' : 'outlined'}
+                disabled={publishing}
               />
             ))
           }
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose} disabled={publishing}>Cancel</Button>
         <Button 
-          onClick={() => onPublish(content.id, selected)} 
+          onClick={handlePublish} 
           variant="contained" 
-          startIcon={<PublishIcon />}
-          disabled={selected.length === 0}
+          startIcon={publishing ? <CircularProgress size={20} color="inherit" /> : <PublishIcon />}
+          disabled={selected.length === 0 || publishing}
         >
-          Publish
+          {publishing ? 'Publishing...' : 'Publish'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -273,39 +236,102 @@ function ContentPage() {
     open: false,
     content: null
   });
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [integrations, setIntegrations] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 0
+  });
   
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setContentItems(mockContentItems);
+  // Function to fetch content from API
+  const fetchContent = async (filterParams = {}) => {
+    setLoading(true);
+    try {
+      // Convert UI filter to API filter parameters
+      const apiFilter = {};
+      
+      if (filter === 'published' || filter === 'ready' || filter === 'draft') {
+        apiFilter.status = filter;
+      }
+      
+      if (filter === 'blog' || filter === 'landing-page' || filter === 'social-media' || filter === 'email') {
+        apiFilter.type = filter;
+      }
+      
+      // Combine with any additional filter params
+      const params = {
+        ...apiFilter,
+        ...filterParams,
+        page: pagination.page,
+        limit: pagination.limit
+      };
+      
+      const response = await contentService.getContent(params);
+      setContentItems(response.contents);
+      setPagination(response.pagination);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching content:', err);
+      setError('Failed to load content. Please try again later.');
+      setContentItems([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
+  
+  // Function to fetch available integrations for publishing
+  const fetchIntegrations = async () => {
+    try {
+      const data = await integrationService.getIntegrations();
+      setIntegrations(data);
+    } catch (err) {
+      console.error('Error fetching integrations:', err);
+      // Don't show error for this as it's not critical
+    }
+  };
+  
+  // Load content and integrations on initial render
+  useEffect(() => {
+    fetchContent();
+    fetchIntegrations();
   }, []);
+  
+  // Reload content when filter changes
+  useEffect(() => {
+    fetchContent();
+  }, [filter, pagination.page, pagination.limit]);
   
   const handleFilterChange = (event) => {
     setFilter(event.target.value);
+    // Reset to first page when changing filters
+    setPagination(prev => ({
+      ...prev,
+      page: 1
+    }));
   };
   
-  const filteredItems = contentItems.filter(item => {
-    if (filter === 'all') return true;
-    if (filter === 'published') return item.status === 'published';
-    if (filter === 'ready') return item.status === 'ready';
-    if (filter === 'draft') return item.status === 'draft';
-    if (filter === 'blog') return item.type === 'blog';
-    if (filter === 'landing-page') return item.type === 'landing-page';
-    if (filter === 'social-media') return item.type === 'social-media';
-    if (filter === 'email') return item.type === 'email';
-    return true;
-  });
+  // We handle filtering on the server side now with the fetchContent function
+  const filteredItems = contentItems;
   
-  const handleViewContent = (content) => {
-    console.log('View content:', content);
-    // In a real app, you would navigate to a detailed view of this content
+  const handleViewContent = async (content) => {
+    try {
+      // Fetch full content details including history and analytics
+      const contentDetails = await contentService.getContentById(content.id);
+      // This would typically navigate to a detailed view
+      console.log('Content details:', contentDetails);
+      // For now, we'll just log the details
+    } catch (err) {
+      console.error(`Error fetching content details for ${content.id}:`, err);
+      setError(`Failed to load content details for "${content.title}"`);
+    }
   };
   
   const handleEditContent = (content) => {
+    // This would typically navigate to an editor
     console.log('Edit content:', content);
-    // In a real app, you would navigate to an editor for this content
   };
   
   const handleOpenPublishDialog = (content) => {
@@ -322,31 +348,51 @@ function ContentPage() {
     });
   };
   
-  const handlePublishContent = (contentId, destinations) => {
-    console.log('Publishing content ID:', contentId, 'to destinations:', destinations);
-    
-    // Update local state - in a real app this would be an API call
-    const newContentItems = contentItems.map(item => {
-      if (item.id === contentId) {
-        return {
-          ...item,
-          status: 'published',
-          publishDestinations: destinations
-        };
-      }
-      return item;
-    });
-    
-    setContentItems(newContentItems);
-    handleClosePublishDialog();
+  const handlePublishContent = async (contentId, destinations) => {
+    try {
+      setLoading(true);
+      // Call the publishContent API
+      await contentService.publishContent(contentId, destinations);
+      
+      // Refresh content list to get updated status
+      await fetchContent();
+      
+      setSuccessMessage('Content published successfully');
+      handleClosePublishDialog();
+    } catch (err) {
+      console.error(`Error publishing content ${contentId}:`, err);
+      setError('Failed to publish content. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const handleDeleteContent = (content) => {
-    console.log('Delete content:', content);
-    
-    // Update local state - in a real app this would be an API call with confirmation
-    const newContentItems = contentItems.filter(item => item.id !== content.id);
-    setContentItems(newContentItems);
+  const handleDeleteContent = async (content) => {
+    if (window.confirm(`Are you sure you want to delete "${content.title}"?`)) {
+      try {
+        setLoading(true);
+        // Call the deleteContent API
+        await contentService.deleteContent(content.id);
+        
+        // Refresh content list
+        await fetchContent();
+        
+        setSuccessMessage('Content deleted successfully');
+      } catch (err) {
+        console.error(`Error deleting content ${content.id}:`, err);
+        setError('Failed to delete content. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+  
+  const handleCloseError = () => {
+    setError(null);
+  };
+  
+  const handleCloseSuccess = () => {
+    setSuccessMessage(null);
   };
   
   if (loading) {
@@ -359,6 +405,30 @@ function ContentPage() {
   
   return (
     <Box>
+      {/* Success Message Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={handleCloseSuccess}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSuccess} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      
+      {/* Error Message Snackbar */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={handleCloseError}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseError} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+      
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1">
           Content Management
@@ -403,13 +473,30 @@ function ContentPage() {
           </FormControl>
         </Box>
         
-        <ContentTable 
-          items={filteredItems}
-          onView={handleViewContent}
-          onEdit={handleEditContent}
-          onPublish={handleOpenPublishDialog}
-          onDelete={handleDeleteContent}
-        />
+        {contentItems.length > 0 ? (
+          <>
+            <ContentTable 
+              items={filteredItems}
+              onView={handleViewContent}
+              onEdit={handleEditContent}
+              onPublish={handleOpenPublishDialog}
+              onDelete={handleDeleteContent}
+            />
+            
+            {/* Pagination controls would go here */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Typography variant="body2">
+                Showing page {pagination.page} of {pagination.pages} ({pagination.total} total items)
+              </Typography>
+            </Box>
+          </>
+        ) : (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              No content items found with the current filter.
+            </Typography>
+          </Box>
+        )}
       </Paper>
       
       <PublishDialog
