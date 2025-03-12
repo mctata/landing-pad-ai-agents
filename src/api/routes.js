@@ -1,6 +1,7 @@
 /**
  * API Routes
  * Defines API endpoints for the Landing Pad Digital AI Agent System
+ * Enhanced with security middleware and access control
  */
 
 const express = require('express');
@@ -13,232 +14,268 @@ const analyticsController = require('./controllers/analyticsController');
 const systemController = require('./controllers/systemController');
 const integrationController = require('./controllers/integrationController');
 
-// Middleware
+// Import middleware
 const auth = require('./middleware/auth');
 const validate = require('./middleware/validate');
+const security = require('./middleware/security');
 
-// System routes
+// Create middleware chains for different types of endpoints
+// Apply appropriate security middleware based on the endpoint requirements
+
+// Basic security middleware for all API endpoints
+const baseSecurityMiddleware = [
+  security.sanitizeInputs,
+  security.preventXss
+];
+
+// Authentication middleware chain
+const authMiddleware = [
+  ...baseSecurityMiddleware,
+  auth.authenticate
+];
+
+// Admin middleware chain
+const adminMiddleware = [
+  ...baseSecurityMiddleware,
+  auth.authenticate,
+  auth.requireAdmin
+];
+
+// API key middleware for integration endpoints
+const apiKeyMiddleware = [
+  ...baseSecurityMiddleware,
+  security.validateApiKey({ requiredScopes: ['content:read', 'content:write'] })
+];
+
+// System routes - health check is public, status requires authentication
 router.get('/health', systemController.healthCheck);
-router.get('/status', auth.authenticate, systemController.getSystemStatus);
+router.get('/status', authMiddleware, systemController.getSystemStatus);
 
 // Authentication routes
-router.post('/auth/refresh-token', auth.refreshToken);
-router.post('/auth/change-password', auth.authenticate, systemController.changePassword);
-router.post('/auth/reset-password-request', systemController.requestPasswordReset);
-router.post('/auth/reset-password', systemController.resetPassword);
-router.get('/auth/verify-token', auth.authenticate, (req, res) => res.status(200).send({ valid: true }));
+router.post('/auth/refresh-token', baseSecurityMiddleware, auth.refreshToken);
+router.post('/auth/change-password', [...authMiddleware, auth.checkPasswordChangeRequired], systemController.changePassword);
+router.post('/auth/reset-password-request', baseSecurityMiddleware, systemController.requestPasswordReset);
+router.post('/auth/reset-password', baseSecurityMiddleware, systemController.resetPassword);
+router.get('/auth/verify-token', authMiddleware, (req, res) => res.status(200).send({ valid: true }));
 
-// Agent status routes
-router.get('/agents', auth.authenticate, agentController.getAllAgentStatus);
-router.get('/agents/:agent', auth.authenticate, agentController.getAgentStatus);
-router.post('/agents/:agent/start', auth.authenticate, agentController.startAgent);
-router.post('/agents/:agent/stop', auth.authenticate, agentController.stopAgent);
+// Agent status routes - standard authentication
+router.get('/agents', authMiddleware, agentController.getAllAgentStatus);
+router.get('/agents/:agent', authMiddleware, agentController.getAgentStatus);
+router.post('/agents/:agent/start', adminMiddleware, agentController.startAgent);
+router.post('/agents/:agent/stop', adminMiddleware, agentController.stopAgent);
 
-// Content Strategy Agent routes
+// Content Strategy Agent routes - require write permission
 router.post('/strategy/brief', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.createBrief, 
   agentController.createContentBrief
 );
 
 router.post('/strategy/calendar', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.generateCalendar, 
   agentController.generateContentCalendar
 );
 
 router.post('/strategy/audience', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.analyzeAudience, 
   agentController.analyzeAudience
 );
 
-// Content Creation Agent routes
+// Content Creation Agent routes - require write permission
 router.post('/creation/generate', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.generateContent, 
   agentController.generateContent
 );
 
 router.post('/creation/edit', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.editContent, 
   agentController.editContent
 );
 
 router.post('/creation/headlines', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.generateHeadlines, 
   agentController.generateHeadlines
 );
 
-// Content Management Agent routes
+// Content Management Agent routes - require write permission
 router.post('/management/categorize', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.categorizeContent, 
   agentController.categorizeContent
 );
 
 router.post('/management/schedule', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.scheduleContent, 
   agentController.scheduleContent
 );
 
 router.post('/management/check-freshness', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   validate.checkFreshness, 
   agentController.checkContentFreshness
 );
 
-// Optimisation Agent routes
+// Optimisation Agent routes - require write permission
 router.post('/optimization/analyze', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   validate.analyzePerformance, 
   agentController.analyzeContentPerformance
 );
 
 router.post('/optimization/seo', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.generateSeoRecommendations, 
   agentController.generateSeoRecommendations
 );
 
 router.post('/optimization/ab-testing', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.generateAbTesting, 
   agentController.generateAbTestingSuggestions
 );
 
-// Brand Consistency Agent routes
+// Brand Consistency Agent routes - require write permission
 router.post('/brand/review', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   validate.reviewContent, 
   agentController.reviewContentForBrand
 );
 
 router.post('/brand/fix', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.fixConsistencyIssues, 
   agentController.fixConsistencyIssues
 );
 
 router.post('/brand/guidelines', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.updateGuidelines, 
   agentController.updateBrandGuidelines
 );
 
-// Content routes
+// Content routes - read operations require read permission, write operations require write permission
 router.get('/content', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   contentController.listContent
 );
 
 router.get('/content/:id', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   contentController.getContent
 );
 
 router.post('/content', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.createContent, 
   contentController.createContent
 );
 
 router.put('/content/:id', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:write')], 
   validate.updateContent, 
   contentController.updateContent
 );
 
 router.delete('/content/:id', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:delete')], 
   contentController.deleteContent
 );
 
 router.get('/content/:id/history', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   contentController.getContentHistory
 );
 
 router.get('/content/:id/analytics', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('content:read')], 
   contentController.getContentAnalytics
 );
 
-// Analytics routes
+// Analytics routes - require analytics permission
 router.get('/analytics/performance', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('analytics:read')], 
   analyticsController.getPerformanceMetrics
 );
 
 router.get('/analytics/topics', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('analytics:read')], 
   analyticsController.getTopicPerformance
 );
 
 router.get('/analytics/channels', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('analytics:read')], 
   analyticsController.getChannelPerformance
 );
 
 router.get('/analytics/audience', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('analytics:read')], 
   analyticsController.getAudienceInsights
 );
 
 router.get('/analytics/dashboard', 
-  auth.authenticate, 
+  [...authMiddleware, auth.requirePermission('analytics:read')], 
   analyticsController.getDashboardData
 );
 
-// Integration routes
+// Integration routes - either user authentication or API key authentication
 router.get('/integrations/status',
-  auth.authenticate,
+  authMiddleware,
   integrationController.getIntegrationStatus
 );
 
-// CMS integrations
+// CMS integrations - support both user auth and API key authentication
 router.post('/integrations/cms/:platform/publish',
-  auth.authenticate,
+  [...baseSecurityMiddleware, 
+   (req, res, next) => req.headers['x-api-key'] ? security.validateApiKey({requiredScopes: ['content:write', 'integrations:write']})(req, res, next) : auth.authenticate(req, res, next)],
+  validate.publishToCms,
   integrationController.publishToCms
 );
 
 router.put('/integrations/cms/:platform/:externalId',
-  auth.authenticate,
+  [...baseSecurityMiddleware, 
+   (req, res, next) => req.headers['x-api-key'] ? security.validateApiKey({requiredScopes: ['content:write', 'integrations:write']})(req, res, next) : auth.authenticate(req, res, next)],
+  validate.updateOnCms,
   integrationController.updateOnCms
 );
 
 router.post('/integrations/cms/:platform/import',
-  auth.authenticate,
+  [...baseSecurityMiddleware, 
+   (req, res, next) => req.headers['x-api-key'] ? security.validateApiKey({requiredScopes: ['content:write', 'integrations:read']})(req, res, next) : auth.authenticate(req, res, next)],
+  validate.importFromCms,
   integrationController.importFromCms
 );
 
 // Social media integrations
 router.post('/integrations/social/:platform/post',
-  auth.authenticate,
+  [...authMiddleware, auth.requirePermission('content:publish')],
+  validate.postToSocial,
   integrationController.postToSocial
 );
 
 router.get('/integrations/social/:platform/:externalId/metrics',
-  auth.authenticate,
+  [...authMiddleware, auth.requirePermission('analytics:read')],
   integrationController.getSocialMetrics
 );
 
 // Analytics integrations
 router.get('/integrations/analytics/page/:pageUrl',
-  auth.authenticate,
+  [...authMiddleware, auth.requirePermission('analytics:read')],
   integrationController.getPageAnalytics
 );
 
 router.get('/integrations/analytics/top-content',
-  auth.authenticate,
+  [...authMiddleware, auth.requirePermission('analytics:read')],
   integrationController.getTopPerformingContent
 );
 
 router.get('/integrations/analytics/site-metrics',
-  auth.authenticate,
+  [...authMiddleware, auth.requirePermission('analytics:read')],
   integrationController.getSiteMetrics
 );
 
