@@ -5,6 +5,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 
 import Dashboard from './admin/Dashboard';
 import IntegrationsPage from './admin/IntegrationsPage';
+import AgentsPage from './admin/AgentsPage';
+import WorkflowsPage from './admin/WorkflowsPage';
 import ContentPage from './content/ContentPage';
 import AnalyticsPage from './analytics/AnalyticsPage';
 
@@ -27,9 +29,11 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />}>
           <Route index element={<AnalyticsPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
+          <Route path="agents" element={<AgentsPage />} />
+          <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="content" element={<ContentPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
         </Route>
       </Routes>
     </ThemeProvider>

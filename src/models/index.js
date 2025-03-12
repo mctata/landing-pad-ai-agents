@@ -14,5 +14,6 @@ module.exports = {
   Workflow: require('./workflowModel'),
   Agent: require('./agentModel'),
   Schedule: require('./scheduleModel'),
-  Report: require('./reportModel')
+  Report: require('./reportModel'),
+  ApiKey: require('./apiKeyModel')
 };

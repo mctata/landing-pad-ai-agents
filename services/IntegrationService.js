@@ -6,6 +6,7 @@
 // CMS Integrations
 const WordPressIntegration = require('../src/integrations/cms/wordpressIntegration');
 const ShopifyIntegration = require('../src/integrations/cms/shopifyIntegration');
+const ContentfulIntegration = require('../src/integrations/cms/contentfulIntegration');
 
 // Social Media Integrations
 const TwitterIntegration = require('../src/integrations/social/twitterIntegration');
@@ -74,6 +75,13 @@ class IntegrationService {
         const shopifyConfig = this.config.publishing.shopify;
         this.integrations.cms.shopify = new ShopifyIntegration(shopifyConfig, this.logger);
         await this.integrations.cms.shopify.initialize();
+      }
+      
+      // Contentful
+      if (this.config.publishing && this.config.publishing.contentful) {
+        const contentfulConfig = this.config.publishing.contentful;
+        this.integrations.cms.contentful = new ContentfulIntegration(contentfulConfig, this.logger);
+        await this.integrations.cms.contentful.initialize();
       }
       
       this.logger.info('CMS integrations initialized');

@@ -429,9 +429,237 @@ export const authService = {
   }
 };
 
+// API service for agent operations
+export const agentService = {
+  // Get all agents status
+  getAllAgentStatus: async () => {
+    try {
+      const response = await apiClient.get('/agents');
+      return response.data.agents;
+    } catch (error) {
+      console.error('Error fetching agent status:', error);
+      throw error;
+    }
+  },
+  
+  // Get specific agent status
+  getAgentStatus: async (agentName) => {
+    try {
+      const response = await apiClient.get(`/agents/${agentName}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching agent ${agentName} status:`, error);
+      throw error;
+    }
+  },
+  
+  // Start an agent
+  startAgent: async (agentName) => {
+    try {
+      const response = await apiClient.post(`/agents/${agentName}/start`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error starting agent ${agentName}:`, error);
+      throw error;
+    }
+  },
+  
+  // Stop an agent
+  stopAgent: async (agentName) => {
+    try {
+      const response = await apiClient.post(`/agents/${agentName}/stop`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error stopping agent ${agentName}:`, error);
+      throw error;
+    }
+  },
+  
+  // Create a content brief
+  createContentBrief: async (briefData) => {
+    try {
+      const response = await apiClient.post('/strategy/brief', briefData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating content brief:', error);
+      throw error;
+    }
+  },
+  
+  // Generate content calendar
+  generateContentCalendar: async (calendarData) => {
+    try {
+      const response = await apiClient.post('/strategy/calendar', calendarData);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating content calendar:', error);
+      throw error;
+    }
+  },
+  
+  // Generate content
+  generateContent: async (contentData) => {
+    try {
+      const response = await apiClient.post('/creation/generate', contentData);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating content:', error);
+      throw error;
+    }
+  },
+  
+  // Edit content
+  editContent: async (editData) => {
+    try {
+      const response = await apiClient.post('/creation/edit', editData);
+      return response.data;
+    } catch (error) {
+      console.error('Error editing content:', error);
+      throw error;
+    }
+  },
+  
+  // Generate headlines
+  generateHeadlines: async (headlineData) => {
+    try {
+      const response = await apiClient.post('/creation/headlines', headlineData);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating headlines:', error);
+      throw error;
+    }
+  },
+  
+  // Check content for brand consistency
+  reviewContentForBrand: async (reviewData) => {
+    try {
+      const response = await apiClient.post('/brand/review', reviewData);
+      return response.data;
+    } catch (error) {
+      console.error('Error reviewing content for brand consistency:', error);
+      throw error;
+    }
+  },
+  
+  // Generate SEO recommendations
+  generateSeoRecommendations: async (seoData) => {
+    try {
+      const response = await apiClient.post('/optimization/seo', seoData);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating SEO recommendations:', error);
+      throw error;
+    }
+  },
+  
+  // Generate A/B testing suggestions
+  generateAbTestingSuggestions: async (abData) => {
+    try {
+      const response = await apiClient.post('/optimization/ab-testing', abData);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating A/B testing suggestions:', error);
+      throw error;
+    }
+  }
+};
+
+// API service for workflow operations
+export const workflowService = {
+  // Get all workflows
+  getAllWorkflows: async (filters = {}) => {
+    try {
+      const response = await apiClient.get('/workflows', { params: filters });
+      return response.data.workflows;
+    } catch (error) {
+      console.error('Error fetching workflows:', error);
+      throw error;
+    }
+  },
+  
+  // Get a specific workflow by ID
+  getWorkflow: async (workflowId) => {
+    try {
+      const response = await apiClient.get(`/workflows/${workflowId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching workflow ${workflowId}:`, error);
+      throw error;
+    }
+  },
+  
+  // Create a new workflow
+  createWorkflow: async (workflowData) => {
+    try {
+      const response = await apiClient.post('/workflows', workflowData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating workflow:', error);
+      throw error;
+    }
+  },
+  
+  // Cancel a workflow
+  cancelWorkflow: async (workflowId) => {
+    try {
+      const response = await apiClient.post(`/workflows/${workflowId}/cancel`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error canceling workflow ${workflowId}:`, error);
+      throw error;
+    }
+  },
+  
+  // Pause a workflow
+  pauseWorkflow: async (workflowId) => {
+    try {
+      const response = await apiClient.post(`/workflows/${workflowId}/pause`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error pausing workflow ${workflowId}:`, error);
+      throw error;
+    }
+  },
+  
+  // Resume a workflow
+  resumeWorkflow: async (workflowId) => {
+    try {
+      const response = await apiClient.post(`/workflows/${workflowId}/resume`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error resuming workflow ${workflowId}:`, error);
+      throw error;
+    }
+  },
+  
+  // Get predefined workflow templates
+  getWorkflowTemplates: async () => {
+    try {
+      const response = await apiClient.get('/workflow-templates');
+      return response.data.templates;
+    } catch (error) {
+      console.error('Error fetching workflow templates:', error);
+      throw error;
+    }
+  },
+  
+  // Create workflow from template
+  createFromTemplate: async (templateId, parameters) => {
+    try {
+      const response = await apiClient.post(`/workflow-templates/${templateId}/create`, { parameters });
+      return response.data;
+    } catch (error) {
+      console.error(`Error creating workflow from template ${templateId}:`, error);
+      throw error;
+    }
+  }
+};
+
 export default {
   integrationService,
   contentService,
   analyticsService,
-  authService
+  authService,
+  agentService,
+  workflowService
 };

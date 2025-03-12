@@ -3,11 +3,13 @@ import {
   Box, Typography, Paper, Grid, Card, CardContent, 
   CardActions, Button, Chip, CircularProgress, 
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, FormControlLabel, Switch, Alert, Snackbar
+  TextField, FormControlLabel, Switch, Alert, Snackbar,
+  MenuItem
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SettingsIcon from '@mui/icons-material/Settings';
+import AddIcon from '@mui/icons-material/Add';
 import { integrationService } from '../services/api';
 
 // Fallback data structure in case API fails
@@ -235,6 +237,177 @@ function ConfigurationDialog({ open, integration, onClose, onSave }) {
   );
 }
 
+function AddIntegrationDialog({ open, type, onClose, onAdd }) {
+  const [selectedIntegrationType, setSelectedIntegrationType] = useState('');
+  const [config, setConfig] = useState({
+    enabled: true
+  });
+  
+  useEffect(() => {
+    if (type) {
+      setSelectedIntegrationType('');
+      setConfig({ enabled: true });
+    }
+  }, [type]);
+  
+  const handleIntegrationTypeChange = (event) => {
+    setSelectedIntegrationType(event.target.value);
+    
+    // Reset config but keep enabled flag
+    setConfig({ enabled: true });
+    
+    // Set default fields based on integration type
+    switch (event.target.value) {
+      case 'contentful':
+        setConfig({
+          enabled: true,
+          spaceId: '',
+          deliveryApiKey: '',
+          managementApiKey: '',
+          environment: 'master'
+        });
+        break;
+      case 'wordpress':
+        setConfig({
+          enabled: true,
+          endpoint: '',
+          username: '',
+          applicationPassword: ''
+        });
+        break;
+      case 'linkedin':
+        setConfig({
+          enabled: true,
+          clientId: '',
+          clientSecret: '',
+          accessToken: '',
+          refreshToken: '',
+          companyId: ''
+        });
+        break;
+      // Add more default configs as needed
+    }
+  };
+  
+  const handleChange = (key, value) => {
+    setConfig({
+      ...config,
+      [key]: value
+    });
+  };
+  
+  // Get available integrations based on type
+  const getAvailableIntegrations = () => {
+    switch (type) {
+      case 'cms':
+        return [
+          { id: 'wordpress', name: 'WordPress' },
+          { id: 'contentful', name: 'Contentful' },
+          { id: 'shopify', name: 'Shopify' }
+        ];
+      case 'social':
+        return [
+          { id: 'twitter', name: 'Twitter/X' },
+          { id: 'linkedin', name: 'LinkedIn' },
+          { id: 'facebook', name: 'Facebook' },
+          { id: 'instagram', name: 'Instagram' },
+          { id: 'bluesky', name: 'Bluesky' }
+        ];
+      case 'analytics':
+        return [
+          { id: 'google-analytics', name: 'Google Analytics' }
+        ];
+      default:
+        return [];
+    }
+  };
+  
+  const handleSubmit = () => {
+    // Create new integration object
+    const newIntegration = {
+      id: selectedIntegrationType,
+      name: getAvailableIntegrations().find(i => i.id === selectedIntegrationType)?.name || selectedIntegrationType,
+      status: 'not_connected',
+      lastSync: new Date().toISOString(),
+      config
+    };
+    
+    onAdd(type, newIntegration);
+  };
+  
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Add New {type ? type.charAt(0).toUpperCase() + type.slice(1) : ''} Integration</DialogTitle>
+      <DialogContent>
+        <Box sx={{ mt: 2 }}>
+          <TextField
+            select
+            label="Integration Type"
+            value={selectedIntegrationType}
+            onChange={handleIntegrationTypeChange}
+            fullWidth
+            margin="normal"
+          >
+            {getAvailableIntegrations().map((integration) => (
+              <MenuItem key={integration.id} value={integration.id}>
+                {integration.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          
+          {selectedIntegrationType && (
+            <>
+              <Typography variant="subtitle1" sx={{ mt: 2 }}>
+                Configuration
+              </Typography>
+              
+              {Object.entries(config).map(([key, value]) => {
+                if (key === 'enabled') {
+                  return (
+                    <FormControlLabel
+                      key={key}
+                      control={
+                        <Switch 
+                          checked={value} 
+                          onChange={(e) => handleChange(key, e.target.checked)}
+                        />
+                      }
+                      label="Enabled"
+                      sx={{ mt: 2, display: 'block' }}
+                    />
+                  );
+                }
+                
+                return (
+                  <TextField
+                    key={key}
+                    label={key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
+                    value={value}
+                    onChange={(e) => handleChange(key, e.target.value)}
+                    type={['apiKey', 'apiSecret', 'accessToken', 'clientSecret', 'password', 'applicationPassword', 'managementApiKey', 'deliveryApiKey'].includes(key) ? 'password' : 'text'}
+                    fullWidth
+                    margin="normal"
+                  />
+                );
+              })}
+            </>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button 
+          onClick={handleSubmit} 
+          variant="contained"
+          disabled={!selectedIntegrationType}
+        >
+          Add Integration
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [integrations, setIntegrations] = useState(null);
@@ -245,6 +418,11 @@ function IntegrationsPage() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [testingConnection, setTestingConnection] = useState(false);
+  
+  const [addIntegrationDialog, setAddIntegrationDialog] = useState({
+    open: false,
+    type: null // cms, social, analytics
+  });
   
   const fetchIntegrations = async () => {
     setLoading(true);
@@ -353,6 +531,42 @@ function IntegrationsPage() {
     fetchIntegrations();
   };
   
+  const handleOpenAddIntegration = (type) => {
+    setAddIntegrationDialog({
+      open: true,
+      type
+    });
+  };
+  
+  const handleCloseAddIntegration = () => {
+    setAddIntegrationDialog({
+      open: false,
+      type: null
+    });
+  };
+  
+  const handleAddIntegration = async (type, newIntegration) => {
+    try {
+      // In a real implementation, this would call an API endpoint
+      // For now, we'll just update the local state
+      
+      // Add the new integration to our state
+      const newIntegrations = {...integrations};
+      newIntegrations[type].push(newIntegration);
+      setIntegrations(newIntegrations);
+      
+      // Close the dialog
+      handleCloseAddIntegration();
+      
+      // Show success message
+      setSuccessMessage(`${newIntegration.name} integration added successfully`);
+      
+    } catch (err) {
+      console.error('Error adding integration:', err);
+      setError(`Failed to add integration: ${err.message}`);
+    }
+  };
+  
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -402,9 +616,19 @@ function IntegrationsPage() {
       </Box>
       
       <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom>
-          Content Management Systems
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" component="h2">
+            Content Management Systems
+          </Typography>
+          <Button 
+            variant="outlined" 
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenAddIntegration('cms')}
+          >
+            Add CMS
+          </Button>
+        </Box>
         <Grid container spacing={3}>
           {integrations.cms.map(integration => (
             <Grid item xs={12} sm={6} md={4} key={integration.id}>
@@ -416,13 +640,32 @@ function IntegrationsPage() {
               />
             </Grid>
           ))}
+          {integrations.cms.length === 0 && (
+            <Grid item xs={12}>
+              <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="body1" color="text.secondary">
+                  No CMS integrations configured. Click "Add CMS" to set up your first integration.
+                </Typography>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </Paper>
       
       <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom>
-          Social Media
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" component="h2">
+            Social Media
+          </Typography>
+          <Button 
+            variant="outlined" 
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenAddIntegration('social')}
+          >
+            Add Social Media
+          </Button>
+        </Box>
         <Grid container spacing={3}>
           {integrations.social.map(integration => (
             <Grid item xs={12} sm={6} md={4} key={integration.id}>
@@ -434,13 +677,32 @@ function IntegrationsPage() {
               />
             </Grid>
           ))}
+          {integrations.social.length === 0 && (
+            <Grid item xs={12}>
+              <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="body1" color="text.secondary">
+                  No social media integrations configured. Click "Add Social Media" to set up your first integration.
+                </Typography>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </Paper>
       
       <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" component="h2" gutterBottom>
-          Analytics Platforms
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" component="h2">
+            Analytics Platforms
+          </Typography>
+          <Button 
+            variant="outlined" 
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenAddIntegration('analytics')}
+          >
+            Add Analytics
+          </Button>
+        </Box>
         <Grid container spacing={3}>
           {integrations.analytics.map(integration => (
             <Grid item xs={12} sm={6} md={4} key={integration.id}>
@@ -452,14 +714,32 @@ function IntegrationsPage() {
               />
             </Grid>
           ))}
+          {integrations.analytics.length === 0 && (
+            <Grid item xs={12}>
+              <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="body1" color="text.secondary">
+                  No analytics integrations configured. Click "Add Analytics" to set up your first integration.
+                </Typography>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </Paper>
       
+      {/* Configuration Dialog */}
       <ConfigurationDialog
         open={configDialog.open}
         integration={configDialog.integration}
         onClose={handleCloseConfig}
         onSave={handleSaveConfig}
+      />
+      
+      {/* Add Integration Dialog */}
+      <AddIntegrationDialog 
+        open={addIntegrationDialog.open}
+        type={addIntegrationDialog.type}
+        onClose={handleCloseAddIntegration}
+        onAdd={handleAddIntegration}
       />
     </Box>
   );

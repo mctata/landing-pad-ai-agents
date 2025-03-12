@@ -167,7 +167,7 @@ async function initialize() {
     logger.info('Landing Pad Digital AI Agent System initialized successfully');
     
     // Setup graceful shutdown
-    setupGracefulShutdown(mongoClient);
+    setupGracefulShutdown();
     
   } catch (error) {
     logger.error('Error initializing system:', error);
@@ -180,12 +180,81 @@ function initializeWebServer() {
   const app = express();
   const port = process.env.PORT || 3000;
   
+  // Import security middlewares
+  const security = require('./api/middleware/security');
+  const cookieParser = require('cookie-parser');
+  const session = require('express-session');
+  const { rateLimit } = require('express-rate-limit');
+  const MongoStore = require('connect-mongo');
+  
   // Configure middleware
-  app.use(helmet());
-  app.use(cors({
-    origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*'
+  // Apply Helmet with enhanced security settings 
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' && process.env.DISABLE_CSP !== 'true',
+    xssFilter: true,
+    noSniff: true,
+    hsts: {
+      maxAge: 31536000, // 1 year in seconds
+      includeSubDomains: true,
+      preload: true
+    },
+    frameguard: {
+      action: 'deny'
+    }
   }));
-  app.use(express.json());
+  
+  // Configure CORS with more options
+  app.use(cors({
+    origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : (process.env.NODE_ENV === 'production' ? false : '*'),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-API-Key'],
+    exposedHeaders: ['X-New-Access-Token', 'X-New-Refresh-Token'],
+    credentials: true,
+    maxAge: 86400 // 24 hours in seconds
+  }));
+  
+  // Parse cookies
+  app.use(cookieParser(process.env.COOKIE_SECRET));
+  
+  // Configure sessions with secure settings
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'session-secret',
+    name: 'landing-pad-session',
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    },
+    rolling: true,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      ttl: 24 * 60 * 60 // 24 hours in seconds
+    })
+  }));
+  
+  // Configure body parsing with limits
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  
+  // Apply rate limiting
+  app.use(security.advancedRateLimit);
+  
+  // Prevent NoSQL injection
+  app.use(security.sanitizeInputs);
+  
+  // Prevent XSS attacks
+  app.use(security.preventXss);
+  
+  // Apply custom Content Security Policy middleware for additional control
+  app.use(security.contentSecurityPolicy);
+  
+  // Apply CSRF protection to non-API routes
+  app.use(/^(?!\/api\/).*$/, security.csrfProtection, security.setCsrfToken);
+  
+  // Configure request logging
   app.use(morgan('combined', {
     stream: {
       write: (message) => logger.http(message.trim())
@@ -225,7 +294,7 @@ function initializeWebServer() {
 }
 
 // Set up graceful shutdown
-function setupGracefulShutdown(mongoClient) {
+function setupGracefulShutdown() {
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
     

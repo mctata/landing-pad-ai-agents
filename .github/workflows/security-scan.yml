@@ -1,0 +1,85 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly scan on Sundays at midnight
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16.x]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    # Dependency vulnerability scanning with npm audit
+    - name: Run npm audit
+      run: npm audit --production
+    
+    # Static code analysis with ESLint (with security rules)
+    - name: Install ESLint and security plugins
+      run: |
+        npm install --save-dev eslint eslint-plugin-security eslint-plugin-node
+    
+    - name: Run ESLint security scan
+      run: npx eslint . --ext .js --config .eslintrc.js --quiet --ignore-pattern 'node_modules/'
+    
+    # Secret scanning with GitLeaks
+    - name: GitLeaks scan
+      uses: zricethezav/gitleaks-action@v2
+      with:
+        config-path: .github/gitleaks.toml
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    # License compliance scanning
+    - name: License compliance check
+      run: npx license-checker --summary --onlyAllow "MIT;ISC;Apache-2.0;BSD-3-Clause;BSD-2-Clause;CC-BY-4.0;CC0-1.0"
+    
+    # Container image scanning with Trivy (if using Docker)
+    - name: Build Docker image
+      if: success() || failure()
+      run: docker build -t landing-pad-ai-agents:${{ github.sha }} .
+    
+    - name: Run Trivy vulnerability scanner
+      if: success() || failure()
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'landing-pad-ai-agents:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+        timeout: '10m'
+    
+    # SAST scanning with NodeJSScan
+    - name: NodeJsScan
+      if: success() || failure()
+      uses: ajinabraham/njsscan-action@master
+      with:
+        args: '.'
+    
+    # Run custom security check script
+    - name: Run custom security check
+      if: success() || failure()
+      run: npm run security:check
+      
+    # Run tests to ensure security features work correctly
+    - name: Run security tests
+      if: success() || failure()
+      run: npm test -- --testPathPattern=__tests__/(unit|integration)/.*/(auth|security)

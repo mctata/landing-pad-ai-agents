@@ -21,6 +21,13 @@ const validate = require('./middleware/validate');
 router.get('/health', systemController.healthCheck);
 router.get('/status', auth.authenticate, systemController.getSystemStatus);
 
+// Authentication routes
+router.post('/auth/refresh-token', auth.refreshToken);
+router.post('/auth/change-password', auth.authenticate, systemController.changePassword);
+router.post('/auth/reset-password-request', systemController.requestPasswordReset);
+router.post('/auth/reset-password', systemController.resetPassword);
+router.get('/auth/verify-token', auth.authenticate, (req, res) => res.status(200).send({ valid: true }));
+
 // Agent status routes
 router.get('/agents', auth.authenticate, agentController.getAllAgentStatus);
 router.get('/agents/:agent', auth.authenticate, agentController.getAgentStatus);

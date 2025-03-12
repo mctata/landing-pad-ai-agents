@@ -1,0 +1,85 @@
+# GitLeaks Configuration for Landing Pad AI Agents
+
+title = "Landing Pad AI Agents GitLeaks Configuration"
+
+# Allow list for known false positives
+[[allowlist]]
+description = "Allowed file extensions"
+paths = [
+    '''(.*?)(jpg|jpeg|png|gif|svg|webp|mp4|mov|webm)$''',
+]
+
+# AWS Keys
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key"
+regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+tags = ["aws", "credentials"]
+severity = "HIGH"
+
+# AWS Secret Key
+[[rules]]
+id = "aws-secret-key"
+description = "AWS Secret Key"
+regex = '''(?i)aws(.{0,20})?(?-i)['\"][0-9a-zA-Z\/+]{40}['\"]'''
+tags = ["aws", "credentials"]
+severity = "HIGH"
+
+# AWS MWS key
+[[rules]]
+id = "aws-mws-key"
+description = "AWS MWS Key"
+regex = '''amzn\.mws\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'''
+tags = ["aws", "credentials"]
+severity = "HIGH"
+
+# Private key
+[[rules]]
+id = "private-key"
+description = "Private key"
+regex = '''-----BEGIN (.*)PRIVATE KEY-----'''
+tags = ["keys", "private-key"]
+severity = "CRITICAL"
+
+# JWT
+[[rules]]
+id = "jwt"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*'''
+tags = ["jwt", "token"]
+severity = "HIGH"
+
+# Password in code
+[[rules]]
+id = "password-in-code"
+description = "Password as string variable in code"
+regex = '''(?i)(password|passwd|pass|pwd)(.{0,20})?[=:>][^,);\n]{0,20}['"]([^'"]{4,})['"]'''
+tags = ["password", "credentials"]
+[[rules.allowlist]]
+regex = '''(?i)(password|passwd|pass|pwd)(.{0,20})?[=:>][^,);\n]{0,20}['"](?:$PASSWORD_PLACEHOLDER$|$PASS$|$SECRET$|password|PASSWORD|<<PASSWORD>>)['"]'''
+
+# Generic API Key
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api_key|apikey|api-key)(.{0,20})?[=:][^,);\n]{0,20}['"]([^'"]{4,})['"]'''
+tags = ["api-key", "credentials"]
+[[rules.allowlist]]
+regex = '''(?i)(api_key|apikey|api-key)(.{0,20})?[=:][^,);\n]{0,20}['"](?:$API_KEY_PLACEHOLDER$|$API_KEY$|<<API_KEY>>)['"]'''
+
+# MongoDB Connection String
+[[rules]]
+id = "mongodb-uri"
+description = "MongoDB Connection String"
+regex = '''mongodb(?:+srv)?://(?:[^:]+:[^@]+@)?[^/?]+(?:/[^?]+)?(?:\?(?:replicaSet|ssl|connectTimeoutMS|authSource|appName)=.+?)*'''
+tags = ["mongodb", "connection-string"]
+severity = "HIGH"
+
+# Generic Secret
+[[rules]]
+id = "generic-secret"
+description = "Generic Secret"
+regex = '''(?i)(secret|confidential|sensitive)(.{0,20})?[=:][^,);\n]{0,20}['"]([^'"]{4,})['"]'''
+tags = ["secret", "credentials"]
+[[rules.allowlist]]
+regex = '''(?i)(secret|confidential|sensitive)(.{0,20})?[=:][^,);\n]{0,20}['"](?:$SECRET_PLACEHOLDER$|$SECRET$|<<SECRET>>)['"]'''

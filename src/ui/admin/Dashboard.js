@@ -10,6 +10,8 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import IntegrationInstructionsIcon from '@mui/icons-material/IntegrationInstructions';
 import ArticleIcon from '@mui/icons-material/Article';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 
 const drawerWidth = 240;
 
@@ -29,9 +31,11 @@ function Dashboard() {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Integrations', icon: <IntegrationInstructionsIcon />, path: '/integrations' },
+    { text: 'AI Agents', icon: <SmartToyIcon />, path: '/agents' },
+    { text: 'Workflows', icon: <AccountTreeIcon />, path: '/workflows' },
     { text: 'Content', icon: <ArticleIcon />, path: '/content' },
     { text: 'Analytics', icon: <BarChartIcon />, path: '/analytics' },
+    { text: 'Integrations', icon: <IntegrationInstructionsIcon />, path: '/integrations' },
   ];
 
   const drawer = (
