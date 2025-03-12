@@ -13,7 +13,11 @@ const Joi = require('joi');
  */
 const validate = (schema, source = 'body') => {
   return (req, res, next) => {
-    const { error, value } = schema.validate(req[source]);
+    const { error, value } = schema.validate(req[source], { 
+      abortEarly: false, // Return all errors, not just the first one
+      stripUnknown: true, // Remove unknown keys from the validated data
+      allowUnknown: false // Don't allow unknown keys in the input data
+    });
     
     if (error) {
       const errorMessage = error.details.map(detail => detail.message).join(', ');
@@ -29,6 +33,54 @@ const validate = (schema, source = 'body') => {
     
     // Replace request data with validated data
     req[source] = value;
+    next();
+  };
+};
+
+/**
+ * Validate parameters and body
+ * @param {Object} paramsSchema - Joi schema for request parameters
+ * @param {Object} bodySchema - Joi schema for request body
+ * @returns {Function} - Combined validation middleware
+ */
+const validateParamsAndBody = (paramsSchema, bodySchema) => {
+  return (req, res, next) => {
+    // First validate params
+    const paramsResult = paramsSchema.validate(req.params, { abortEarly: false });
+    
+    if (paramsResult.error) {
+      const errorMessage = paramsResult.error.details.map(detail => detail.message).join(', ');
+      
+      return res.status(400).json({
+        error: {
+          message: 'Path parameter validation failed',
+          details: errorMessage,
+          code: 'validation_error'
+        }
+      });
+    }
+    
+    // Then validate body
+    const bodyResult = bodySchema.validate(req.body, { 
+      abortEarly: false,
+      stripUnknown: true
+    });
+    
+    if (bodyResult.error) {
+      const errorMessage = bodyResult.error.details.map(detail => detail.message).join(', ');
+      
+      return res.status(400).json({
+        error: {
+          message: 'Request body validation failed',
+          details: errorMessage,
+          code: 'validation_error'
+        }
+      });
+    }
+    
+    // Update with validated data
+    req.params = paramsResult.value;
+    req.body = bodyResult.value;
     next();
   };
 };
@@ -204,3 +256,184 @@ exports.updateContent = validate(Joi.object({
   status: Joi.string().valid('draft', 'pending_review', 'approved', 'published'),
   userId: Joi.string()
 }));
+
+/**
+ * Integration schemas
+ */
+
+// CMS integrations
+exports.publishToCms = validateParamsAndBody(
+  // Params schema
+  Joi.object({
+    platform: Joi.string().valid('contentful', 'wordpress', 'shopify').required()
+  }),
+  // Body schema
+  Joi.object({
+    contentId: Joi.string().when('content', {
+      is: Joi.exist(),
+      then: Joi.optional(),
+      otherwise: Joi.required()
+    }),
+    content: Joi.object({
+      title: Joi.string().required(),
+      content: Joi.alternatives().try(
+        Joi.string(),
+        Joi.object({
+          body: Joi.string().required(),
+          format: Joi.string().valid('html', 'markdown', 'plain').default('html')
+        })
+      ).required(),
+      meta_description: Joi.string(),
+      keywords: Joi.array().items(Joi.string()),
+      type: Joi.string().valid('blog', 'article', 'page', 'product', 'landing_page').required(),
+      categories: Joi.array().items(Joi.string()),
+      featured_image: Joi.object({
+        url: Joi.string().uri(),
+        alt: Joi.string(),
+        id: Joi.string()
+      }),
+      seo: Joi.object({
+        title: Joi.string(),
+        description: Joi.string(),
+        keywords: Joi.array().items(Joi.string())
+      })
+    }).when('contentId', {
+      is: Joi.exist(),
+      then: Joi.optional(),
+      otherwise: Joi.required()
+    }),
+    publish: Joi.boolean().default(true),
+    options: Joi.object()
+  })
+);
+
+exports.updateOnCms = validateParamsAndBody(
+  // Params schema
+  Joi.object({
+    platform: Joi.string().valid('contentful', 'wordpress', 'shopify').required(),
+    externalId: Joi.string().required()
+  }),
+  // Body schema
+  Joi.object({
+    title: Joi.string(),
+    content: Joi.alternatives().try(
+      Joi.string(),
+      Joi.object({
+        body: Joi.string().required(),
+        format: Joi.string().valid('html', 'markdown', 'plain').default('html')
+      })
+    ),
+    meta_description: Joi.string(),
+    keywords: Joi.array().items(Joi.string()),
+    categories: Joi.array().items(Joi.string()),
+    featured_image: Joi.object({
+      url: Joi.string().uri(),
+      alt: Joi.string(),
+      id: Joi.string()
+    }),
+    seo: Joi.object({
+      title: Joi.string(),
+      description: Joi.string(),
+      keywords: Joi.array().items(Joi.string())
+    }),
+    publish: Joi.boolean().default(true),
+    options: Joi.object()
+  })
+);
+
+exports.importFromCms = validateParamsAndBody(
+  // Params schema
+  Joi.object({
+    platform: Joi.string().valid('contentful', 'wordpress', 'shopify').required()
+  }),
+  // Body schema
+  Joi.object({
+    limit: Joi.number().integer().min(1).max(100).default(20),
+    contentType: Joi.string(),
+    filter: Joi.object(),
+    since: Joi.date().iso(),
+    options: Joi.object()
+  })
+);
+
+// Social media integrations
+exports.postToSocial = validateParamsAndBody(
+  // Params schema
+  Joi.object({
+    platform: Joi.string().valid('twitter', 'facebook', 'linkedin', 'instagram', 'bluesky').required()
+  }),
+  // Body schema
+  Joi.object({
+    contentId: Joi.string().when('content', {
+      is: Joi.exist(),
+      then: Joi.optional(),
+      otherwise: Joi.required()
+    }),
+    content: Joi.object({
+      text: Joi.string().required(),
+      media: Joi.array().items(
+        Joi.object({
+          type: Joi.string().valid('image', 'video').required(),
+          url: Joi.string().uri().required(),
+          alt: Joi.string()
+        })
+      ),
+      link: Joi.string().uri()
+    }).when('contentId', {
+      is: Joi.exist(),
+      then: Joi.optional(),
+      otherwise: Joi.required()
+    }),
+    isThread: Joi.boolean().default(false),
+    threadItems: Joi.array().items(
+      Joi.object({
+        text: Joi.string().required(),
+        media: Joi.array().items(
+          Joi.object({
+            type: Joi.string().valid('image', 'video').required(),
+            url: Joi.string().uri().required(),
+            alt: Joi.string()
+          })
+        )
+      })
+    ).when('isThread', {
+      is: true,
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
+    options: Joi.object()
+  })
+);
+
+// Analytics integrations
+exports.getPageAnalytics = validate(
+  Joi.object({
+    url: Joi.string().uri().required(),
+    startDate: Joi.date().iso(),
+    endDate: Joi.date().iso().greater(Joi.ref('startDate')),
+    metrics: Joi.array().items(Joi.string()),
+    dimensions: Joi.array().items(Joi.string())
+  }),
+  'query'
+);
+
+exports.getTopContent = validate(
+  Joi.object({
+    limit: Joi.number().integer().min(1).max(50).default(10),
+    startDate: Joi.date().iso(),
+    endDate: Joi.date().iso().greater(Joi.ref('startDate')),
+    metrics: Joi.array().items(Joi.string()).default(['pageviews']),
+    contentType: Joi.string()
+  }),
+  'query'
+);
+
+exports.getSiteMetrics = validate(
+  Joi.object({
+    startDate: Joi.date().iso(),
+    endDate: Joi.date().iso().greater(Joi.ref('startDate')),
+    metrics: Joi.array().items(Joi.string()).default(['pageviews', 'users', 'bounceRate', 'avgSessionDuration']),
+    dimensions: Joi.array().items(Joi.string())
+  }),
+  'query'
+);
