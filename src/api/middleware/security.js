@@ -1,6 +1,7 @@
 /**
  * Security Middleware
  * Enhanced security measures for API endpoints
+ * Includes CSRF protection, rate limiting, input sanitization, and API key validation
  */
 
 const { randomBytes } = require('crypto');
@@ -8,6 +9,8 @@ const csrf = require('csurf');
 const xss = require('xss-clean');
 const mongoSanitize = require('express-mongo-sanitize');
 const { rateLimit } = require('express-rate-limit');
+const { nanoid } = require('nanoid');
+const performance = require('perf_hooks').performance;
 
 /**
  * Generate and configure CSRF protection middleware
@@ -60,7 +63,7 @@ exports.contentSecurityPolicy = (req, res, next) => {
 };
 
 /**
- * Configure advanced rate limiting
+ * Configure advanced rate limiting for general API access
  * @returns {Function} Rate limiting middleware
  */
 exports.advancedRateLimit = rateLimit({
@@ -84,6 +87,76 @@ exports.advancedRateLimit = rateLimit({
     if (req.user && req.user.roles && req.user.roles.includes('admin')) return true;
     
     return false;
+  }
+});
+
+/**
+ * Authentication rate limiting - more strict limits for authentication endpoints
+ * to prevent brute force attacks
+ * @returns {Function} Authentication-specific rate limiting middleware
+ */
+exports.authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Max 20 requests per 15-minute window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      message: 'Too many authentication attempts, please try again later.',
+      code: 'auth_rate_limit_exceeded'
+    }
+  },
+  // Don't skip successful requests - all auth attempts count
+  skipSuccessfulRequests: false
+});
+
+/**
+ * Content generation rate limiting - specialized limits for AI content generation
+ * to prevent abuse and control costs
+ * @returns {Function} Content generation rate limiting middleware
+ */
+exports.contentGenerationRateLimit = rateLimit({
+  windowMs: process.env.CONTENT_GEN_RATE_LIMIT_WINDOW || 60 * 60 * 1000, // 1 hour by default
+  max: process.env.CONTENT_GEN_RATE_LIMIT_MAX || 30, // Max 30 generations per hour by default
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      message: 'AI content generation rate limit exceeded. Please try again later.',
+      code: 'content_generation_rate_limit_exceeded'
+    }
+  },
+  // Rate limit by user ID or IP
+  keyGenerator: (req) => {
+    // Use user ID if authenticated, otherwise use IP
+    return req.user ? `user_${req.user.id}` : `ip_${req.ip}`;
+  },
+  // Skip for specific roles or API keys
+  skip: (req) => {
+    // Skip for admin users
+    if (req.user && req.user.roles && req.user.roles.includes('admin')) return true;
+    
+    // Skip for API keys with unlimited generation privileges
+    if (req.apiKeyInfo && req.apiKeyInfo.scopes.includes('unlimited_generation')) return true;
+    
+    return false;
+  }
+});
+
+/**
+ * Admin operation rate limiting - restrict admin operations frequency
+ * @returns {Function} Admin rate limiting middleware
+ */
+exports.adminRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100, // Max 100 admin operations per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      message: 'Admin operation rate limit exceeded. Please try again later.',
+      code: 'admin_rate_limit_exceeded'
+    }
   }
 });
 
@@ -158,6 +231,9 @@ exports.validateApiKey = (options = {}) => {
         }
       }
       
+      // Update last used timestamp
+      await db.models.ApiKey.updateLastUsed(keyRecord._id);
+      
       // Attach API key info to request
       req.apiKeyInfo = {
         id: keyRecord._id,
@@ -170,4 +246,87 @@ exports.validateApiKey = (options = {}) => {
       next(error);
     }
   };
+};
+
+/**
+ * Performance monitoring middleware
+ * Tracks API endpoint performance and attaches metrics to requests
+ */
+exports.performanceMonitoring = (req, res, next) => {
+  // Skip if performance monitoring is disabled
+  if (process.env.DISABLE_PERFORMANCE_MONITORING === 'true') {
+    return next();
+  }
+  
+  // Generate unique request ID if not already present
+  req.requestId = req.headers['x-request-id'] || nanoid(16);
+  
+  // Add request ID to response headers
+  res.setHeader('X-Request-ID', req.requestId);
+  
+  // Initialize performance tracking
+  req.performanceMetrics = {
+    requestId: req.requestId,
+    startTime: performance.now(),
+    endTime: null,
+    duration: null,
+    route: req.originalUrl,
+    method: req.method,
+    userId: req.user?.id || 'anonymous',
+    apiKeyId: req.apiKeyInfo?.id,
+    completed: false
+  };
+  
+  // Track response metrics when the response is sent
+  const originalEnd = res.end;
+  res.end = function(...args) {
+    // Calculate performance metrics
+    req.performanceMetrics.endTime = performance.now();
+    req.performanceMetrics.duration = req.performanceMetrics.endTime - req.performanceMetrics.startTime;
+    req.performanceMetrics.statusCode = res.statusCode;
+    req.performanceMetrics.completed = true;
+    
+    // Add metrics to response headers
+    res.setHeader('X-Response-Time', `${req.performanceMetrics.duration.toFixed(2)}ms`);
+    
+    // Log performance metrics for high-latency requests only (to avoid flooding logs)
+    const highLatency = 500; // 500ms threshold
+    if (req.performanceMetrics.duration > highLatency && req.app.locals.agentContainer) {
+      req.app.locals.agentContainer.logger.warn('High latency request', {
+        performanceMetrics: req.performanceMetrics,
+        threshold: highLatency
+      });
+    }
+    
+    // Send metrics to monitoring system if one is configured
+    if (req.app.locals.agentContainer && 
+        req.app.locals.agentContainer.services && 
+        req.app.locals.agentContainer.services.monitoring) {
+      req.app.locals.agentContainer.services.monitoring.recordMetric('api_request', req.performanceMetrics);
+    }
+    
+    // Call the original end method
+    return originalEnd.apply(this, args);
+  };
+  
+  next();
+};
+
+/**
+ * Add security headers to all responses
+ */
+exports.securityHeaders = (req, res, next) => {
+  // Add strict security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  
+  // HSTS - Only in production
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  
+  next();
 };

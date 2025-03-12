@@ -24,6 +24,8 @@ const security = require('./middleware/security');
 
 // Basic security middleware for all API endpoints
 const baseSecurityMiddleware = [
+  security.securityHeaders,
+  security.performanceMonitoring,
   security.sanitizeInputs,
   security.preventXss
 ];
@@ -37,6 +39,7 @@ const authMiddleware = [
 // Admin middleware chain
 const adminMiddleware = [
   ...baseSecurityMiddleware,
+  security.adminRateLimit,
   auth.authenticate,
   auth.requireAdmin
 ];
@@ -47,15 +50,25 @@ const apiKeyMiddleware = [
   security.validateApiKey({ requiredScopes: ['content:read', 'content:write'] })
 ];
 
+// Content generation middleware chain
+const contentGenerationMiddleware = [
+  ...baseSecurityMiddleware,
+  security.contentGenerationRateLimit,
+  auth.authenticate,
+  auth.requirePermission('content:write')
+];
+
 // System routes - health check is public, status requires authentication
 router.get('/health', systemController.healthCheck);
 router.get('/status', authMiddleware, systemController.getSystemStatus);
 
-// Authentication routes
-router.post('/auth/refresh-token', baseSecurityMiddleware, auth.refreshToken);
+// Authentication routes - apply specific auth rate limiting
+const authSecurityMiddleware = [...baseSecurityMiddleware, security.authRateLimit];
+
+router.post('/auth/refresh-token', authSecurityMiddleware, auth.refreshToken);
 router.post('/auth/change-password', [...authMiddleware, auth.checkPasswordChangeRequired], systemController.changePassword);
-router.post('/auth/reset-password-request', baseSecurityMiddleware, systemController.requestPasswordReset);
-router.post('/auth/reset-password', baseSecurityMiddleware, systemController.resetPassword);
+router.post('/auth/reset-password-request', authSecurityMiddleware, systemController.requestPasswordReset);
+router.post('/auth/reset-password', authSecurityMiddleware, systemController.resetPassword);
 router.get('/auth/verify-token', authMiddleware, (req, res) => res.status(200).send({ valid: true }));
 
 // Agent status routes - standard authentication
@@ -64,40 +77,40 @@ router.get('/agents/:agent', authMiddleware, agentController.getAgentStatus);
 router.post('/agents/:agent/start', adminMiddleware, agentController.startAgent);
 router.post('/agents/:agent/stop', adminMiddleware, agentController.stopAgent);
 
-// Content Strategy Agent routes - require write permission
+// Content Strategy Agent routes - require write permission and apply rate limiting
 router.post('/strategy/brief', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.createBrief, 
   agentController.createContentBrief
 );
 
 router.post('/strategy/calendar', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.generateCalendar, 
   agentController.generateContentCalendar
 );
 
 router.post('/strategy/audience', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.analyzeAudience, 
   agentController.analyzeAudience
 );
 
-// Content Creation Agent routes - require write permission
+// Content Creation Agent routes - require write permission and apply rate limiting
 router.post('/creation/generate', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.generateContent, 
   agentController.generateContent
 );
 
 router.post('/creation/edit', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.editContent, 
   agentController.editContent
 );
 
 router.post('/creation/headlines', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.generateHeadlines, 
   agentController.generateHeadlines
 );
@@ -121,7 +134,7 @@ router.post('/management/check-freshness',
   agentController.checkContentFreshness
 );
 
-// Optimisation Agent routes - require write permission
+// Optimisation Agent routes - apply appropriate rate limiting
 router.post('/optimization/analyze', 
   [...authMiddleware, auth.requirePermission('content:read')], 
   validate.analyzePerformance, 
@@ -129,13 +142,13 @@ router.post('/optimization/analyze',
 );
 
 router.post('/optimization/seo', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.generateSeoRecommendations, 
   agentController.generateSeoRecommendations
 );
 
 router.post('/optimization/ab-testing', 
-  [...authMiddleware, auth.requirePermission('content:write')], 
+  contentGenerationMiddleware, 
   validate.generateAbTesting, 
   agentController.generateAbTestingSuggestions
 );
