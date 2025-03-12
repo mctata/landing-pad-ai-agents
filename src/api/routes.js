@@ -62,6 +62,17 @@ const contentGenerationMiddleware = [
 router.get('/health', systemController.healthCheck);
 router.get('/status', authMiddleware, systemController.getSystemStatus);
 
+// Agent health and recovery routes - require admin permission
+router.get('/system/agents/:agentId/health', adminMiddleware, systemController.getAgentHealth);
+router.get('/system/agents/:agentId/recovery-history', adminMiddleware, systemController.getAgentRecoveryHistory);
+router.post('/system/agents/:agentId/restart', adminMiddleware, systemController.restartAgent);
+router.post('/system/agents/register', adminMiddleware, systemController.registerAgent);
+
+// Dead letter queue management - require admin permission
+router.get('/system/dead-letter-queue', adminMiddleware, systemController.getDeadLetterQueue);
+router.post('/system/dead-letter-queue/:key/retry', adminMiddleware, systemController.retryDeadLetterQueueEntry);
+router.delete('/system/dead-letter-queue/:key', adminMiddleware, systemController.deleteDeadLetterQueueEntry);
+
 // Authentication routes - apply specific auth rate limiting
 const authSecurityMiddleware = [...baseSecurityMiddleware, security.authRateLimit];
 

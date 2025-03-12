@@ -172,24 +172,134 @@ class BaseModule {
    * @protected
    * @param {Error} error - Error object
    * @param {string} context - Error context
+   * @param {boolean} rethrow - Whether to rethrow the error after handling
    */
-  _handleError(error, context) {
+  async _handleError(error, context, rethrow = true) {
     this.logger.error(`Error in ${context}: ${error.message}`, error);
     
-    // Report error to monitoring service if needed
+    // Extract error details
+    const errorCategory = error.category || 'internal';
+    const errorCode = error.code || 'UNKNOWN_ERROR';
+    
+    // Create error event payload
+    const errorEvent = {
+      module: this.constructor.name,
+      context,
+      error: error.message,
+      stack: error.stack,
+      category: errorCategory,
+      code: errorCode,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Report error to monitoring service if available
     if (this.services.monitoring) {
-      this.services.monitoring.reportError(error, {
-        module: this.constructor.name,
-        context
-      }).catch(err => {
-        this.logger.error(`Failed to report error: ${err.message}`, err);
-      });
+      try {
+        await this.services.monitoring.reportError(error, {
+          module: this.constructor.name,
+          context
+        });
+      } catch (reportError) {
+        this.logger.error(`Failed to report error: ${reportError.message}`, reportError);
+      }
+    }
+    
+    // Publish error event if messaging is available
+    if (this.services.messaging) {
+      try {
+        await this.services.messaging.publishEvent('module.error', errorEvent);
+      } catch (publishError) {
+        this.logger.error(`Failed to publish error event: ${publishError.message}`, publishError);
+      }
     }
     
     // Set module status to error
     this.status = 'error';
     
-    throw error;
+    // Rethrow if requested
+    if (rethrow) {
+      throw error;
+    }
+  }
+  
+  /**
+   * Execute an operation with circuit breaker pattern
+   * @protected
+   * @param {Function} operation - Function to execute
+   * @param {string} serviceName - Name of the service being called
+   * @param {Object} options - Circuit breaker options
+   * @returns {Promise<any>} - Result of the operation
+   */
+  async _executeWithCircuitBreaker(operation, serviceName, options = {}) {
+    // Use error handling service if available
+    if (this.services.errorHandling) {
+      try {
+        return await this.services.errorHandling.executeWithRetry(operation, 
+          options.policyName || 'default',
+          { 
+            service: serviceName,
+            ...options.context
+          }
+        );
+      } catch (error) {
+        // Add service name to error for better tracking
+        error.service = serviceName;
+        throw error;
+      }
+    } else {
+      // Fallback to direct execution if no error handling service
+      try {
+        return await operation();
+      } catch (error) {
+        error.service = serviceName;
+        throw error;
+      }
+    }
+  }
+  
+  /**
+   * Get module metrics
+   * @returns {Object} - Module metrics
+   */
+  async getMetrics() {
+    // Default implementation
+    return {
+      status: this.status,
+      lastActivity: this._lastActivity || null
+    };
+  }
+  
+  /**
+   * Check if a service is available (circuit is closed)
+   * @protected
+   * @param {string} serviceName - Name of the service to check
+   * @returns {boolean} - True if service is available
+   */
+  async _isServiceAvailable(serviceName) {
+    if (this.services.errorHandling) {
+      try {
+        // This will throw if circuit is open
+        this.services.errorHandling._checkCircuitBreaker(serviceName);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+    
+    // Default to available if no error handling service
+    return true;
+  }
+  
+  /**
+   * Reset circuit breaker for a service
+   * @protected
+   * @param {string} serviceName - Name of the service
+   */
+  async _resetServiceCircuitBreaker(serviceName) {
+    if (this.services.errorHandling) {
+      await this.services.errorHandling.resetCircuitBreaker(serviceName);
+      this.logger.info(`Reset circuit breaker for service: ${serviceName}`);
+    }
   }
 }
 

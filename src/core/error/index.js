@@ -5,6 +5,7 @@
  */
 
 const errorHandlingService = require('./errorHandlingService');
+const agentRecoveryService = require('./agentRecoveryService');
 const errors = require('./errors');
 
 module.exports = {
@@ -12,6 +13,10 @@ module.exports = {
   getInstance: errorHandlingService.getInstance,
   ErrorCategory: errorHandlingService.ErrorCategory,
   ErrorSeverity: errorHandlingService.ErrorSeverity,
+  
+  // Agent recovery service
+  getRecoveryService: agentRecoveryService.getInstance,
+  RecoveryStrategy: agentRecoveryService.RecoveryStrategy,
   
   // Error classes
   LandingPadError: errors.LandingPadError,
