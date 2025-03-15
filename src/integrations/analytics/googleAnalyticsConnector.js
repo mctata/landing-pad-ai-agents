@@ -3,7 +3,7 @@
  * Handles data retrieval from Google Analytics 4 (GA4)
  */
 
-const { BetaAnalyticsDataClient } = require('google-analytics-data');
+const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 
 class GoogleAnalyticsConnector {
   constructor(config, logger) {
