@@ -12,20 +12,31 @@ const { Sequelize } = require('sequelize');
 const models = require('../src/models');
 const fs = require('fs');
 const path = require('path');
-const { promisify } = require('util');
-const readFile = promisify(fs.readFile);
-const logger = require('../src/common/services/logger').createLogger('db-init');
+const winston = require('winston');
 const { execSync } = require('child_process');
+
+// Create a logger for this script
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.colorize(),
+    winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+  ),
+  transports: [
+    new winston.transports.Console()
+  ]
+});
 
 // Get PostgreSQL connection info from environment variables
 const dbConfig = {
   username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
+  password: process.env.DB_PASSWORD || 'admin123',
   database: process.env.DB_NAME || 'agents_db',
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432', 10),
   dialect: 'postgres',
-  logging: msg => logger.debug(msg)
+  logging: msg => logger.debug ? logger.debug(msg) : logger.info(msg)
 };
 
 // Define default agents
@@ -344,7 +355,7 @@ async function initializeDatabase() {
     console.log('Database initialization completed successfully');
   } catch (error) {
     console.error('Database initialization failed:', error);
-    process.exit(1);
+    throw error;
   } finally {
     // Close the database connection
     if (sequelize) {
