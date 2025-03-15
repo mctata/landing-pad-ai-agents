@@ -23,11 +23,10 @@ These agents work together through a shared message bus and knowledge repository
 ### Prerequisites
 
 - Node.js 18.x or higher
-- PostgreSQL 17.0 or higher
-- RabbitMQ 3.10 or higher
-- Python 3.10 or higher (for analytics components)
+- PostgreSQL 14.0 or higher
+- RabbitMQ 3.10 or higher (optional for local development)
 - API keys for AI services (Anthropic Claude and OpenAI)
-- AWS account for S3 storage (for production)
+- AWS account for S3 storage (optional for local development)
 
 ### Installing Prerequisites
 
@@ -305,12 +304,20 @@ The project is configured to use these S3 buckets:
    \q
    ```
 
-5. Initialize the database:
+5. Set up the database:
    ```bash
-   npm run db:init
+   # Create the database
+   sudo -u postgres psql -c "CREATE DATABASE agents_db;"
+   sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE agents_db TO postgres;"
+   
+   # Apply migrations
+   npx sequelize-cli db:migrate --config migrations/sequelize/config/config.js --migrations-path migrations/sequelize/migrations
+   
+   # Seed initial data
+   npx sequelize-cli db:seed:all --config migrations/sequelize/config/config.js --seeders-path migrations/sequelize/seeders
    ```
 
-5. Start the agent system:
+6. Start the agent system:
    ```bash
    npm run start
    ```
@@ -462,13 +469,14 @@ These examples demonstrate the capabilities of the agent system and provide temp
 
 ### Common Issues
 
-- **Messaging Errors**: Check RabbitMQ status and connection settings with `rabbitmqctl status`
+- **Installation Errors**: If you see Node.js module errors, try removing node_modules directory and reinstalling: `rm -rf node_modules && npm install`
+- **Database Connection Issues**: Verify PostgreSQL is running with `pg_isready -h localhost -p 5432`
+- **Missing Tables**: If tables are missing, ensure migrations ran successfully: `npx sequelize-cli db:migrate:status --config migrations/sequelize/config/config.js`
 - **Agent Unresponsive**: Verify agent process is running and check logs
 - **Content Generation Failed**: Ensure AI models are accessible and API keys are valid
-- **Performance Data Missing**: Check analytics integration configurations
-- **Database Connection Issues**: Verify PostgreSQL is running with `pg_isready -h localhost -p 5432`
-- **S3 Storage Issues**: Check AWS credentials with `aws sts get-caller-identity`
-- **Redis Connection Issues**: Check Redis connection with `redis-cli ping`
+- **Messaging Errors**: Check RabbitMQ status and connection settings with `rabbitmqctl status` (if using RabbitMQ)
+- **S3 Storage Issues**: Check AWS credentials with `aws sts get-caller-identity` (if using S3)
+- **PostgreSQL Optimization Errors**: The optimization requires at least PostgreSQL 14 with full-text search support
 
 ### Logging
 
