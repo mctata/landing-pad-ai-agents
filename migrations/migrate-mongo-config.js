@@ -1,36 +1,55 @@
-// In this file you can configure migrate-mongo
-require('dotenv').config();
+// Sequelize CLI configuration
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/landing_pad_ai_agents';
-
-const config = {
-  mongodb: {
-    url: mongoURI,
-    databaseName: "landing_pad_ai_agents",
-    options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+module.exports = {
+  development: {
+    username: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'password',
+    database: process.env.DB_NAME || 'agents_db',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    dialect: 'postgres',
+    seederStorage: 'sequelize',
+    seederStorageTableName: 'sequelize_seeders',
+    migrationStorage: 'sequelize',
+    migrationStorageTableName: 'sequelize_migrations'
+  },
+  test: {
+    username: process.env.TEST_DB_USER || 'postgres',
+    password: process.env.TEST_DB_PASSWORD || 'password',
+    database: process.env.TEST_DB_NAME || 'agents_db_test',
+    host: process.env.TEST_DB_HOST || 'localhost',
+    port: parseInt(process.env.TEST_DB_PORT || '5432', 10),
+    dialect: 'postgres',
+    logging: false
+  },
+  staging: {
+    username: process.env.DEV_DB_USER || 'postgres',
+    password: process.env.DEV_DB_PASSWORD || 'password',
+    database: process.env.DEV_DB_NAME || 'agents_db',
+    host: process.env.DEV_DB_HOST || 'localhost',
+    port: parseInt(process.env.DEV_DB_PORT || '5432', 10),
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
     }
   },
-
-  // The migrations dir, can be an relative or absolute path. 
-  // Only edit this if you specified a different directory when calling 
-  // migrate-mongo create or migrate-mongo init
-  migrationsDir: "migrations/scripts",
-
-  // The mongodb collection where the applied changes are stored. 
-  // Only edit this if you have a good reason to.
-  changelogCollectionName: "migrations_changelog",
-  
-  // The file extension to create migrations and search for in migration directory 
-  migrationFileExtension: ".js",
-  
-  // Enable the algorithm to create a checksum of the file contents and use that in the comparison to determine
-  // if the file should be run.  Requires that scripts are coded to be run multiple times.
-  useFileHash: false,
-  
-  // Don't change this, unless you know what you're doing
-  moduleSystem: 'commonjs',
+  production: {
+    username: process.env.PROD_DB_USER || 'postgres',
+    password: process.env.PROD_DB_PASSWORD || 'password',
+    database: process.env.PROD_DB_NAME || 'agents_db',
+    host: process.env.PROD_DB_HOST || 'localhost',
+    port: parseInt(process.env.PROD_DB_PORT || '5432', 10),
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
+  }
 };
-
-module.exports = config;

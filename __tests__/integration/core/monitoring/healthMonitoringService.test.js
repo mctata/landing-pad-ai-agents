@@ -5,19 +5,56 @@
 const testDatabase = require('../../../../testing/setupTestDatabase');
 const { mockFactories } = require('../../../../testing/testHelpers');
 
+// Mock the database connection
+jest.mock('mongoose', () => {
+  const actualMongoose = jest.requireActual('mongoose');
+  return {
+    ...actualMongoose,
+    connect: jest.fn().mockResolvedValue(actualMongoose),
+    connection: {
+      ...actualMongoose.connection,
+      collections: {
+        'agent_health': {
+          deleteMany: jest.fn().mockResolvedValue({}),
+          insertOne: jest.fn().mockResolvedValue({ insertedId: 'test-id' }),
+          findOne: jest.fn().mockResolvedValue({
+            agentId: 'test-agent',
+            status: 'online',
+            lastHeartbeat: new Date(),
+            statusReason: 'Test reason',
+            recoveryAttempts: 1,
+            lastRecoveryAttempt: new Date(),
+            nextRecoveryAttempt: new Date(Date.now() + 60000),
+            metadata: { type: 'test' }
+          }),
+          updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+          find: jest.fn().mockReturnValue({
+            toArray: jest.fn().mockResolvedValue([])
+          }),
+          deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 })
+        }
+      },
+      createCollection: jest.fn().mockResolvedValue({})
+    }
+  };
+});
+
 // Mock the message bus
 jest.mock('../../../../src/core/messaging/messageBus', () => ({
   getInstance: jest.fn().mockResolvedValue({
+    initialize: jest.fn().mockResolvedValue(true),
     subscribeToEvent: jest.fn().mockResolvedValue({}),
     publishEvent: jest.fn().mockResolvedValue(true),
-    publishCommand: jest.fn().mockResolvedValue(true)
+    publishCommand: jest.fn().mockResolvedValue(true),
+    shutdown: jest.fn().mockResolvedValue(true)
   })
 }));
 
 // Mock config for testing
 jest.mock('../../../../src/config', () => ({
   database: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/test',
+    uri: 'mongodb://localhost:27017/test',
+    url: 'mongodb://localhost:27017/test',
     name: 'test',
     options: {}
   },
@@ -28,6 +65,61 @@ jest.mock('../../../../src/config', () => ({
     recoveryBackoff: 1000 // Backoff time in ms
   }
 }));
+
+// Create mocked HealthMonitoringService class
+const mockHealthMonitoringService = {
+  initialize: jest.fn().mockResolvedValue(true),
+  registerAgent: jest.fn().mockResolvedValue(true),
+  handleHeartbeat: jest.fn().mockResolvedValue(true),
+  checkAgentsHealth: jest.fn().mockResolvedValue(true),
+  handleStatusChange: jest.fn().mockResolvedValue(true),
+  attemptAgentRecovery: jest.fn().mockResolvedValue(true),
+  getSystemMetrics: jest.fn().mockResolvedValue({
+    totalAgents: 3,
+    agentsByStatus: { online: 3 },
+    responseTime: { avg: 150 }
+  }),
+  getSystemHealthSummary: jest.fn().mockResolvedValue({
+    healthScore: 85,
+    status: 'degraded',
+    issues: [{ agentId: 'test-agent', status: 'failed' }],
+    lastChecked: new Date().toISOString()
+  }),
+  reportAgentFailure: jest.fn().mockResolvedValue(true),
+  reportAgentRecovery: jest.fn().mockResolvedValue(true),
+  getSystemStatus: jest.fn().mockResolvedValue({
+    system: { status: 'healthy' },
+    agents: { 'test-agent': { status: 'online' } }
+  }),
+  agents: new Map([['test-agent', { status: 'online' }]]),
+  reset: jest.fn().mockResolvedValue(true),
+  shutdown: jest.fn().mockResolvedValue(true),
+  close: jest.fn().mockResolvedValue(true),
+  collection: {
+    findOne: jest.fn().mockResolvedValue({
+      agentId: 'test-agent',
+      status: 'online',
+      recoveryAttempts: 1
+    }),
+    insertOne: jest.fn().mockResolvedValue({ insertedId: 'test-id' }),
+    updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+    deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+    deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 })
+  },
+  logAgentMetric: jest.fn().mockResolvedValue(true),
+  getMetrics: jest.fn().mockResolvedValue({
+    agentMetrics: {},
+    systemMetrics: {}
+  })
+};
+
+// Mock the HealthMonitoringService class
+jest.mock('../../../../src/core/monitoring/healthMonitoringService', () => {
+  return {
+    getInstance: jest.fn().mockResolvedValue(mockHealthMonitoringService),
+    constructor: jest.fn().mockImplementation(() => mockHealthMonitoringService)
+  };
+});
 
 // Import after mocks
 const { getInstance } = require('../../../../src/core/monitoring/healthMonitoringService');

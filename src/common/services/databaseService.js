@@ -1,63 +1,82 @@
 /**
- * Database Service using Mongoose
- * Provides MongoDB connection and model management
+ * Database Service using Sequelize
+ * Provides PostgreSQL connection and model management
  */
 
-const mongoose = require('mongoose');
+const { Sequelize } = require('sequelize');
 const models = require('../../models');
+const logger = require('./logger');
 
 class DatabaseService {
-  constructor(config, logger) {
+  constructor(config) {
     this.config = config;
-    this.logger = logger;
+    this.logger = logger.createLogger('database');
     this.models = models;
     this.isConnected = false;
-    
-    // Connection options
-    this.options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-    };
+    this.sequelize = null;
   }
 
   /**
-   * Connect to MongoDB
+   * Connect to PostgreSQL
    */
   async connect() {
     try {
-      this.logger.info('Connecting to MongoDB database...');
+      this.logger.info('Connecting to PostgreSQL database...');
       
-      // Set up mongoose connection
-      mongoose.set('strictQuery', false);
+      // Create Sequelize instance
+      this.sequelize = new Sequelize(
+        this.config.database,
+        this.config.username,
+        this.config.password,
+        {
+          host: this.config.host,
+          port: this.config.port,
+          dialect: 'postgres',
+          logging: (msg) => this.logger.debug(msg),
+          pool: {
+            max: 10,
+            min: 0,
+            acquire: 30000,
+            idle: 10000
+          },
+          dialectOptions: {
+            ssl: this.config.ssl ? {
+              require: true,
+              rejectUnauthorized: false
+            } : false
+          },
+          timezone: '+00:00'
+        }
+      );
       
-      // Connect to MongoDB
-      await mongoose.connect(this.config.uri, this.options);
+      // Test the connection
+      await this.sequelize.authenticate();
       
       this.isConnected = true;
-      this.logger.info('MongoDB database connected successfully');
+      this.logger.info('PostgreSQL database connected successfully');
+      
+      // Initialize models
+      this._initializeModels();
       
       return true;
     } catch (error) {
-      this.logger.error('Failed to connect to MongoDB database:', error);
+      this.logger.error('Failed to connect to PostgreSQL database:', error);
       throw error;
     }
   }
 
   /**
-   * Disconnect from MongoDB
+   * Disconnect from PostgreSQL
    */
   async disconnect() {
     try {
-      if (mongoose.connection) {
-        await mongoose.connection.close();
+      if (this.sequelize) {
+        await this.sequelize.close();
         this.isConnected = false;
-        this.logger.info('MongoDB database disconnected');
+        this.logger.info('PostgreSQL database disconnected');
       }
     } catch (error) {
-      this.logger.error('Error disconnecting from MongoDB database:', error);
+      this.logger.error('Error disconnecting from PostgreSQL database:', error);
       throw error;
     }
   }
@@ -68,27 +87,48 @@ class DatabaseService {
   getStatus() {
     return {
       isConnected: this.isConnected,
-      readyState: mongoose.connection ? mongoose.connection.readyState : 0
+      dialect: this.sequelize ? this.sequelize.getDialect() : null
     };
   }
 
   /**
-   * Create indexes for all models
+   * Initialize models and create associations
+   * @private
    */
-  async createIndexes() {
-    try {
-      this.logger.info('Creating indexes for all models...');
-      
-      const modelNames = Object.keys(this.models);
-      for (const modelName of modelNames) {
-        this.logger.debug(`Creating indexes for ${modelName} model...`);
-        await this.models[modelName].createIndexes();
+  _initializeModels() {
+    this.logger.info('Initializing database models...');
+    
+    // Initialize models with sequelize instance
+    for (const modelName in this.models) {
+      if (typeof this.models[modelName].init === 'function') {
+        this.models[modelName].init(this.sequelize);
       }
+    }
+    
+    // Create associations between models
+    for (const modelName in this.models) {
+      if (typeof this.models[modelName].associate === 'function') {
+        this.models[modelName].associate(this.models);
+      }
+    }
+    
+    this.logger.info('Database models initialized');
+  }
+
+  /**
+   * Sync all models with the database
+   * @param {boolean} force - If true, each model will drop the table if it exists before creating it
+   */
+  async syncModels(force = false) {
+    try {
+      this.logger.info(`Syncing database models (force: ${force})...`);
       
-      this.logger.info('All indexes created successfully');
+      await this.sequelize.sync({ force });
+      
+      this.logger.info('Database models synced successfully');
       return true;
     } catch (error) {
-      this.logger.error('Error creating indexes:', error);
+      this.logger.error('Error syncing database models:', error);
       throw error;
     }
   }
@@ -106,14 +146,13 @@ class DatabaseService {
     try {
       // Generate contentId if not provided
       if (!contentData.contentId) {
-        contentData.contentId = this.models.Content.generateContentId();
+        contentData.contentId = await this.models.Content.generateContentId();
       }
       
-      const content = new this.models.Content(contentData);
-      await content.save();
+      const content = await this.models.Content.create(contentData);
       
       // Create initial version
-      await this.createContentVersion(content.contentId, content.toObject(), content.createdBy);
+      await this.createContentVersion(content.contentId, content.toJSON(), content.createdBy);
       
       this.logger.info(`Content created with ID: ${content.contentId}`);
       return content;
@@ -130,7 +169,9 @@ class DatabaseService {
    */
   async getContent(contentId) {
     try {
-      return await this.models.Content.findOne({ contentId });
+      return await this.models.Content.findOne({ 
+        where: { contentId } 
+      });
     } catch (error) {
       this.logger.error(`Error getting content ${contentId}:`, error);
       throw error;
@@ -152,17 +193,13 @@ class DatabaseService {
       }
       
       // Save current state as a version (before applying updates)
-      await this.createContentVersion(contentId, content.toObject(), updateData.updatedBy || 'system');
+      await this.createContentVersion(contentId, content.toJSON(), updateData.updatedBy || 'system');
       
       // Update content
-      const updatedContent = await this.models.Content.findOneAndUpdate(
-        { contentId },
-        updateData,
-        { new: true, runValidators: true }
-      );
+      await content.update(updateData);
       
-      this.logger.info(`Content ${contentId} updated from "${content.title}" to "${updatedContent.title}"`);
-      return updatedContent;
+      this.logger.info(`Content ${contentId} updated from "${content.title}" to "${content.title}"`);
+      return content;
     } catch (error) {
       this.logger.error(`Error updating content ${contentId}:`, error);
       throw error;
@@ -180,24 +217,21 @@ class DatabaseService {
     try {
       // Find the latest version and increment it
       let version = 1;
-      const latestVersion = await this.models.ContentVersion.findOne(
-        { contentId }, 
-        { version: 1 }, 
-        { sort: { version: -1 } }
-      );
+      const latestVersion = await this.models.ContentVersion.findOne({
+        where: { contentId },
+        order: [['version', 'DESC']]
+      });
       
       if (latestVersion) {
         version = latestVersion.version + 1;
       }
       
-      const contentVersion = new this.models.ContentVersion({
+      const contentVersion = await this.models.ContentVersion.create({
         contentId,
         version,
         data: contentData,
         createdBy
       });
-      
-      await contentVersion.save();
       
       this.logger.info(`Created version ${version} for content ${contentId}`);
       return contentVersion;
@@ -214,11 +248,10 @@ class DatabaseService {
    */
   async getContentVersions(contentId) {
     try {
-      return await this.models.ContentVersion.find(
-        { contentId },
-        null,
-        { sort: { version: -1 } }
-      );
+      return await this.models.ContentVersion.findAll({
+        where: { contentId },
+        order: [['version', 'DESC']]
+      });
     } catch (error) {
       this.logger.error(`Error getting content versions for ${contentId}:`, error);
       throw error;
@@ -243,8 +276,10 @@ class DatabaseService {
         return true;
       } else {
         // Hard delete - remove document
-        const result = await this.models.Content.deleteOne({ contentId });
-        return result.deletedCount > 0;
+        const result = await this.models.Content.destroy({
+          where: { contentId }
+        });
+        return result > 0;
       }
     } catch (error) {
       this.logger.error(`Error deleting content ${contentId}:`, error);
@@ -270,44 +305,70 @@ class DatabaseService {
         dateFrom,
         dateTo,
         searchText,
-        sort = { createdAt: -1 },
+        sort = { createdAt: 'DESC' },
         page = 1,
         limit = 20
       } = query;
       
-      // Build filter
-      const filter = {};
+      // Build where clause
+      const where = {};
       
-      if (type) filter.type = type;
-      if (status) filter.status = status;
-      if (categories) filter.categories = { $in: Array.isArray(categories) ? categories : [categories] };
-      if (tags) filter.tags = { $in: Array.isArray(tags) ? tags : [tags] };
-      if (createdBy) filter.createdBy = createdBy;
-      if (updatedBy) filter.updatedBy = updatedBy;
+      if (type) where.type = type;
+      if (status) where.status = status;
+      if (createdBy) where.createdBy = createdBy;
+      if (updatedBy) where.updatedBy = updatedBy;
       
       // Date range
       if (dateFrom || dateTo) {
-        filter.createdAt = {};
-        if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-        if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+        where.createdAt = {};
+        if (dateFrom) where.createdAt.$gte = new Date(dateFrom);
+        if (dateTo) where.createdAt.$lte = new Date(dateTo);
       }
       
-      // Text search
+      // Categories and tags in Sequelize need to be handled with associations or JSON operators
+      // This is a simple example assuming categories and tags are stored as arrays in JSON fields
+      if (categories) {
+        where.categories = Sequelize.fn('JSON_CONTAINS', 
+          Sequelize.col('categories'), 
+          JSON.stringify(Array.isArray(categories) ? categories : [categories])
+        );
+      }
+      
+      if (tags) {
+        where.tags = Sequelize.fn('JSON_CONTAINS', 
+          Sequelize.col('tags'), 
+          JSON.stringify(Array.isArray(tags) ? tags : [tags])
+        );
+      }
+      
+      // For text search, we use ILIKE for PostgreSQL
       if (searchText) {
-        filter.$text = { $search: searchText };
+        where.$or = [
+          { title: { [Sequelize.Op.iLike]: `%${searchText}%` } },
+          { description: { [Sequelize.Op.iLike]: `%${searchText}%` } },
+          { content: { [Sequelize.Op.iLike]: `%${searchText}%` } }
+        ];
       }
       
       // Execute query with pagination
-      const skip = (page - 1) * limit;
+      const offset = (page - 1) * limit;
+      
+      // Convert sort to sequelize format
+      const order = [];
+      for (const [field, direction] of Object.entries(sort)) {
+        order.push([field, direction]);
+      }
       
       // Get total count
-      const total = await this.models.Content.countDocuments(filter);
+      const total = await this.models.Content.count({ where });
       
       // Get results
-      const contents = await this.models.Content.find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit);
+      const contents = await this.models.Content.findAll({
+        where,
+        order,
+        offset,
+        limit
+      });
       
       return {
         contents,
@@ -337,11 +398,10 @@ class DatabaseService {
     try {
       // Generate briefId if not provided
       if (!briefData.briefId) {
-        briefData.briefId = this.models.Brief.generateBriefId();
+        briefData.briefId = await this.models.Brief.generateBriefId();
       }
       
-      const brief = new this.models.Brief(briefData);
-      await brief.save();
+      const brief = await this.models.Brief.create(briefData);
       
       this.logger.info(`Brief created with ID: ${brief.briefId}`);
       return brief;
@@ -358,7 +418,9 @@ class DatabaseService {
    */
   async getBrief(briefId) {
     try {
-      return await this.models.Brief.findOne({ briefId });
+      return await this.models.Brief.findOne({
+        where: { briefId }
+      });
     } catch (error) {
       this.logger.error(`Error getting brief ${briefId}:`, error);
       throw error;
@@ -373,18 +435,18 @@ class DatabaseService {
    */
   async updateBrief(briefId, updateData) {
     try {
-      const updatedBrief = await this.models.Brief.findOneAndUpdate(
-        { briefId },
-        updateData,
-        { new: true, runValidators: true }
-      );
+      const brief = await this.models.Brief.findOne({
+        where: { briefId }
+      });
       
-      if (!updatedBrief) {
+      if (!brief) {
         throw new Error(`Brief with ID ${briefId} not found`);
       }
       
+      await brief.update(updateData);
+      
       this.logger.info(`Brief ${briefId} updated`);
-      return updatedBrief;
+      return brief;
     } catch (error) {
       this.logger.error(`Error updating brief ${briefId}:`, error);
       throw error;
@@ -404,11 +466,10 @@ class DatabaseService {
     try {
       // Generate performanceId if not provided
       if (!metricData.performanceId) {
-        metricData.performanceId = this.models.Metric.generatePerformanceId();
+        metricData.performanceId = await this.models.Metric.generatePerformanceId();
       }
       
-      const metric = new this.models.Metric(metricData);
-      await metric.save();
+      const metric = await this.models.Metric.create(metricData);
       
       this.logger.info(`Metrics created with ID: ${metric.performanceId}`);
       return metric;
@@ -425,7 +486,9 @@ class DatabaseService {
    */
   async getMetrics(performanceId) {
     try {
-      return await this.models.Metric.findOne({ performanceId });
+      return await this.models.Metric.findOne({
+        where: { performanceId }
+      });
     } catch (error) {
       this.logger.error(`Error getting metrics ${performanceId}:`, error);
       throw error;
@@ -442,17 +505,19 @@ class DatabaseService {
     try {
       const { limit = 10, dateStart, dateEnd } = options;
       
-      const query = { contentId };
+      const where = { contentId };
       
       if (dateStart || dateEnd) {
-        query['dateRange.start'] = {};
-        if (dateStart) query['dateRange.start'].$gte = new Date(dateStart);
-        if (dateEnd) query['dateRange.start'].$lte = new Date(dateEnd);
+        where['dateRange.start'] = {};
+        if (dateStart) where['dateRange.start'][Sequelize.Op.gte] = new Date(dateStart);
+        if (dateEnd) where['dateRange.start'][Sequelize.Op.lte] = new Date(dateEnd);
       }
       
-      return await this.models.Metric.find(query)
-        .sort({ 'dateRange.start': -1 })
-        .limit(limit);
+      return await this.models.Metric.findAll({
+        where,
+        order: [['dateRange.start', 'DESC']],
+        limit
+      });
     } catch (error) {
       this.logger.error(`Error getting content metrics for ${contentId}:`, error);
       throw error;
@@ -472,11 +537,10 @@ class DatabaseService {
     try {
       // Generate guidelineId if not provided
       if (!guidelineData.guidelineId) {
-        guidelineData.guidelineId = this.models.BrandGuideline.generateGuidelineId();
+        guidelineData.guidelineId = await this.models.BrandGuideline.generateGuidelineId();
       }
       
-      const guideline = new this.models.BrandGuideline(guidelineData);
-      await guideline.save();
+      const guideline = await this.models.BrandGuideline.create(guidelineData);
       
       this.logger.info(`Brand guideline created with ID: ${guideline.guidelineId}`);
       return guideline;
@@ -493,7 +557,9 @@ class DatabaseService {
    */
   async getBrandGuideline(guidelineId) {
     try {
-      return await this.models.BrandGuideline.findOne({ guidelineId });
+      return await this.models.BrandGuideline.findOne({
+        where: { guidelineId }
+      });
     } catch (error) {
       this.logger.error(`Error getting brand guideline ${guidelineId}:`, error);
       throw error;
@@ -506,8 +572,9 @@ class DatabaseService {
    */
   async getLatestBrandGuideline() {
     try {
-      return await this.models.BrandGuideline.findOne()
-        .sort({ updatedAt: -1 });
+      return await this.models.BrandGuideline.findOne({
+        order: [['updatedAt', 'DESC']]
+      });
     } catch (error) {
       this.logger.error('Error getting latest brand guideline:', error);
       throw error;
@@ -522,18 +589,18 @@ class DatabaseService {
    */
   async updateBrandGuideline(guidelineId, updateData) {
     try {
-      const updatedGuideline = await this.models.BrandGuideline.findOneAndUpdate(
-        { guidelineId },
-        updateData,
-        { new: true, runValidators: true }
-      );
+      const guideline = await this.models.BrandGuideline.findOne({
+        where: { guidelineId }
+      });
       
-      if (!updatedGuideline) {
+      if (!guideline) {
         throw new Error(`Brand guideline with ID ${guidelineId} not found`);
       }
       
+      await guideline.update(updateData);
+      
       this.logger.info(`Brand guideline ${guidelineId} updated`);
-      return updatedGuideline;
+      return guideline;
     } catch (error) {
       this.logger.error(`Error updating brand guideline ${guidelineId}:`, error);
       throw error;
@@ -553,11 +620,10 @@ class DatabaseService {
     try {
       // Generate userId if not provided
       if (!userData.userId) {
-        userData.userId = this.models.User.generateUserId();
+        userData.userId = await this.models.User.generateUserId();
       }
       
-      const user = new this.models.User(userData);
-      await user.save();
+      const user = await this.models.User.create(userData);
       
       this.logger.info(`User created with ID: ${user.userId}`);
       return user;
@@ -574,7 +640,9 @@ class DatabaseService {
    */
   async getUser(userId) {
     try {
-      return await this.models.User.findOne({ userId });
+      return await this.models.User.findOne({
+        where: { userId }
+      });
     } catch (error) {
       this.logger.error(`Error getting user ${userId}:`, error);
       throw error;
@@ -588,7 +656,11 @@ class DatabaseService {
    */
   async getUserByEmail(email) {
     try {
-      return await this.models.User.findOne({ email: email.toLowerCase() });
+      return await this.models.User.findOne({ 
+        where: { 
+          email: email.toLowerCase() 
+        } 
+      });
     } catch (error) {
       this.logger.error(`Error getting user by email ${email}:`, error);
       throw error;
@@ -603,18 +675,18 @@ class DatabaseService {
    */
   async updateUser(userId, updateData) {
     try {
-      const updatedUser = await this.models.User.findOneAndUpdate(
-        { userId },
-        updateData,
-        { new: true, runValidators: true }
-      );
+      const user = await this.models.User.findOne({
+        where: { userId }
+      });
       
-      if (!updatedUser) {
+      if (!user) {
         throw new Error(`User with ID ${userId} not found`);
       }
       
+      await user.update(updateData);
+      
       this.logger.info(`User ${userId} updated`);
-      return updatedUser;
+      return user;
     } catch (error) {
       this.logger.error(`Error updating user ${userId}:`, error);
       throw error;
@@ -634,11 +706,10 @@ class DatabaseService {
     try {
       // Generate workflowId if not provided
       if (!workflowData.workflowId) {
-        workflowData.workflowId = this.models.Workflow.generateWorkflowId();
+        workflowData.workflowId = await this.models.Workflow.generateWorkflowId();
       }
       
-      const workflow = new this.models.Workflow(workflowData);
-      await workflow.save();
+      const workflow = await this.models.Workflow.create(workflowData);
       
       this.logger.info(`Workflow created with ID: ${workflow.workflowId}`);
       return workflow;
@@ -655,7 +726,9 @@ class DatabaseService {
    */
   async getWorkflow(workflowId) {
     try {
-      return await this.models.Workflow.findOne({ workflowId });
+      return await this.models.Workflow.findOne({
+        where: { workflowId }
+      });
     } catch (error) {
       this.logger.error(`Error getting workflow ${workflowId}:`, error);
       throw error;
@@ -670,18 +743,18 @@ class DatabaseService {
    */
   async updateWorkflow(workflowId, updateData) {
     try {
-      const updatedWorkflow = await this.models.Workflow.findOneAndUpdate(
-        { workflowId },
-        updateData,
-        { new: true, runValidators: true }
-      );
+      const workflow = await this.models.Workflow.findOne({
+        where: { workflowId }
+      });
       
-      if (!updatedWorkflow) {
+      if (!workflow) {
         throw new Error(`Workflow with ID ${workflowId} not found`);
       }
       
+      await workflow.update(updateData);
+      
       this.logger.info(`Workflow ${workflowId} updated`);
-      return updatedWorkflow;
+      return workflow;
     } catch (error) {
       this.logger.error(`Error updating workflow ${workflowId}:`, error);
       throw error;
@@ -697,17 +770,22 @@ class DatabaseService {
     try {
       const { type, limit = 100 } = options;
       
-      const query = { 
-        status: { $in: ['pending', 'in_progress'] }
+      const where = { 
+        status: { [Sequelize.Op.in]: ['pending', 'in_progress'] }
       };
       
       if (type) {
-        query.type = type;
+        where.type = type;
       }
       
-      return await this.models.Workflow.find(query)
-        .sort({ priority: -1, createdAt: 1 })
-        .limit(limit);
+      return await this.models.Workflow.findAll({
+        where,
+        order: [
+          ['priority', 'DESC'],
+          ['createdAt', 'ASC']
+        ],
+        limit
+      });
     } catch (error) {
       this.logger.error('Error getting active workflows:', error);
       throw error;
@@ -729,19 +807,21 @@ class DatabaseService {
         throw new Error(`Workflow with ID ${workflowId} not found`);
       }
       
-      const stepIndex = workflow.steps.findIndex(step => step.stepId === stepId);
+      // In a relational database, the steps would typically be in a separate table
+      // For now, we'll assume the workflow model includes a steps JSON array
+      const steps = workflow.steps || [];
+      const stepIndex = steps.findIndex(step => step.stepId === stepId);
       
       if (stepIndex === -1) {
         throw new Error(`Step with ID ${stepId} not found in workflow ${workflowId}`);
       }
       
-      // Update step fields
-      for (const [key, value] of Object.entries(updateData)) {
-        workflow.steps[stepIndex][key] = value;
-      }
+      // Update step fields - this is doing a partial update of a JSON field in PostgreSQL
+      // The exact SQL will depend on how the model is structured
+      steps[stepIndex] = { ...steps[stepIndex], ...updateData };
       
       // Save the updated workflow
-      await workflow.save();
+      await workflow.update({ steps });
       
       this.logger.info(`Workflow ${workflowId} step ${stepId} updated`);
       return workflow;

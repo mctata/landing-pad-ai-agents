@@ -1,368 +1,572 @@
-/**
- * Initial schema migration for Landing Pad Digital AI Content Agents
- * 
- * This migration represents the initial schema for all collections used by the system.
- * It runs before any other migrations and establishes the base schema.
- */
+'use strict';
 
 module.exports = {
-  async up(db, client) {
-    // Creating collections with schema validation
-    
-    // 1. Agent collection
-    await db.createCollection("agents", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["agentId", "name", "type", "status"],
-          properties: {
-            agentId: { bsonType: "string" },
-            name: { bsonType: "string" },
-            description: { bsonType: "string" },
-            type: { bsonType: "string" },
-            status: { bsonType: "string", enum: ["active", "inactive", "maintenance"] },
-            modules: {
-              bsonType: "array",
-              items: {
-                bsonType: "object",
-                required: ["name", "enabled"],
-                properties: {
-                  name: { bsonType: "string" },
-                  description: { bsonType: "string" },
-                  enabled: { bsonType: "bool" },
-                  config: { bsonType: "object" }
-                }
-              }
-            },
-            metrics: {
-              bsonType: "object",
-              properties: {
-                requestsProcessed: { bsonType: "int" },
-                successRate: { bsonType: "double" },
-                averageProcessingTime: { bsonType: "double" },
-                lastActivity: { bsonType: "date" }
-              }
-            },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+  async up(queryInterface, Sequelize) {
+    // Create the Agent table
+    await queryInterface.createTable('agents', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      agent_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      description: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      status: {
+        type: Sequelize.STRING,
+        defaultValue: 'active'
+      },
+      type: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      modules: {
+        type: Sequelize.JSONB,
+        defaultValue: []
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      updated_by: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 2. Content collection
-    await db.createCollection("contents", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["contentId", "title", "contentType", "status"],
-          properties: {
-            contentId: { bsonType: "string" },
-            title: { bsonType: "string" },
-            slug: { bsonType: "string" },
-            description: { bsonType: "string" },
-            contentType: { bsonType: "string" },
-            content: { bsonType: "string" },
-            html: { bsonType: "string" },
-            status: { bsonType: "string" },
-            workflowStatus: { bsonType: "string" },
-            author: { bsonType: "string" },
-            brief: { bsonType: "string" },
-            keywords: { bsonType: "array", items: { bsonType: "string" } },
-            categories: { bsonType: "array", items: { bsonType: "string" } },
-            tags: { bsonType: "array", items: { bsonType: "string" } },
-            versions: { bsonType: "array", items: { bsonType: "string" } },
-            currentVersion: { bsonType: "int" },
-            publishedAt: { bsonType: "date" },
-            expiresAt: { bsonType: "date" },
-            metadata: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the User table
+    await queryInterface.createTable('users', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      user_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      email: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      password: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      first_name: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      last_name: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      roles: {
+        type: Sequelize.ARRAY(Sequelize.STRING),
+        defaultValue: ['user']
+      },
+      status: {
+        type: Sequelize.STRING,
+        defaultValue: 'active'
+      },
+      last_login: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      updated_by: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 3. ContentVersion collection
-    await db.createCollection("contentversions", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["contentId", "versionNumber", "content"],
-          properties: {
-            contentId: { bsonType: "string" },
-            versionNumber: { bsonType: "int" },
-            content: { bsonType: "string" },
-            html: { bsonType: "string" },
-            changelog: { bsonType: "string" },
-            createdAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the Content table
+    await queryInterface.createTable('contents', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      content_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      brief_id: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      title: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      description: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      content: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      type: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      status: {
+        type: Sequelize.STRING,
+        defaultValue: 'draft'
+      },
+      categories: {
+        type: Sequelize.ARRAY(Sequelize.STRING),
+        defaultValue: []
+      },
+      tags: {
+        type: Sequelize.ARRAY(Sequelize.STRING),
+        defaultValue: []
+      },
+      metadata: {
+        type: Sequelize.JSONB,
+        defaultValue: {}
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      updated_by: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 4. Brief collection
-    await db.createCollection("briefs", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["briefId", "title", "contentType"],
-          properties: {
-            briefId: { bsonType: "string" },
-            title: { bsonType: "string" },
-            contentType: { bsonType: "string" },
-            description: { bsonType: "string" },
-            requirements: { bsonType: "string" },
-            audience: { bsonType: "array", items: { bsonType: "string" } },
-            keywords: { bsonType: "array", items: { bsonType: "string" } },
-            tone: { bsonType: "string" },
-            length: { bsonType: "object" },
-            status: { bsonType: "string" },
-            deadline: { bsonType: "date" },
-            assignedTo: { bsonType: "string" },
-            references: { bsonType: "array" },
-            metadata: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the ContentVersion table
+    await queryInterface.createTable('content_versions', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      content_id: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      version: {
+        type: Sequelize.INTEGER,
+        allowNull: false
+      },
+      data: {
+        type: Sequelize.JSONB,
+        allowNull: false
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 5. Metric collection
-    await db.createCollection("metrics", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["metricId", "contentId", "metricType"],
-          properties: {
-            metricId: { bsonType: "string" },
-            contentId: { bsonType: "string" },
-            metricType: { bsonType: "string" },
-            value: { bsonType: ["double", "int", "string"] },
-            unit: { bsonType: "string" },
-            source: { bsonType: "string" },
-            timestamp: { bsonType: "date" },
-            metadata: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" }
-          }
-        }
+
+    // Create a unique constraint for content_id and version
+    await queryInterface.addConstraint('content_versions', {
+      fields: ['content_id', 'version'],
+      type: 'unique',
+      name: 'unique_content_version'
+    });
+
+    // Create the Brief table
+    await queryInterface.createTable('briefs', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      brief_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      title: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      description: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      details: {
+        type: Sequelize.JSONB,
+        defaultValue: {}
+      },
+      status: {
+        type: Sequelize.STRING,
+        defaultValue: 'draft'
+      },
+      content_type: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      due_date: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      updated_by: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 6. BrandGuideline collection
-    await db.createCollection("brandguidelines", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["guidelineId", "version"],
-          properties: {
-            guidelineId: { bsonType: "string" },
-            version: { bsonType: "string" },
-            lastUpdated: { bsonType: "date" },
-            companyName: { bsonType: "object" },
-            productNames: { bsonType: "array" },
-            voice: { bsonType: "object" },
-            terminology: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the Metric table
+    await queryInterface.createTable('metrics', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      performance_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      content_id: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      date_range: {
+        type: Sequelize.JSONB,
+        allowNull: false
+      },
+      metrics: {
+        type: Sequelize.JSONB,
+        defaultValue: {}
+      },
+      source: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 7. User collection
-    await db.createCollection("users", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["userId", "email", "password", "roles", "status"],
-          properties: {
-            userId: { bsonType: "string" },
-            firstName: { bsonType: "string" },
-            lastName: { bsonType: "string" },
-            email: { bsonType: "string" },
-            password: { bsonType: "string" },
-            roles: { bsonType: "array", items: { bsonType: "string" } },
-            status: { bsonType: "string", enum: ["active", "inactive", "pending", "suspended"] },
-            lastLogin: { bsonType: "date" },
-            preferences: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the BrandGuideline table
+    await queryInterface.createTable('brand_guidelines', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      guideline_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      version: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      last_updated: {
+        type: Sequelize.DATE,
+        allowNull: false
+      },
+      company_name: {
+        type: Sequelize.JSONB,
+        allowNull: false
+      },
+      product_names: {
+        type: Sequelize.JSONB,
+        defaultValue: []
+      },
+      voice: {
+        type: Sequelize.JSONB,
+        defaultValue: {}
+      },
+      terminology: {
+        type: Sequelize.JSONB,
+        defaultValue: {}
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      updated_by: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 8. Workflow collection
-    await db.createCollection("workflows", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["workflowId", "name", "steps", "status"],
-          properties: {
-            workflowId: { bsonType: "string" },
-            name: { bsonType: "string" },
-            description: { bsonType: "string" },
-            steps: {
-              bsonType: "array",
-              items: {
-                bsonType: "object",
-                required: ["stepId", "name", "order"],
-                properties: {
-                  stepId: { bsonType: "string" },
-                  name: { bsonType: "string" },
-                  description: { bsonType: "string" },
-                  order: { bsonType: "int" },
-                  assignedTo: { bsonType: "string" },
-                  agentType: { bsonType: "string" },
-                  requiredModules: { bsonType: "array", items: { bsonType: "string" } },
-                  completionCriteria: { bsonType: "object" }
-                }
-              }
-            },
-            status: { bsonType: "string", enum: ["active", "inactive", "archived"] },
-            contentTypes: { bsonType: "array", items: { bsonType: "string" } },
-            metadata: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the Workflow table
+    await queryInterface.createTable('workflows', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      workflow_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      description: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      type: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      status: {
+        type: Sequelize.STRING,
+        defaultValue: 'pending'
+      },
+      priority: {
+        type: Sequelize.INTEGER,
+        defaultValue: 1
+      },
+      content_id: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      brief_id: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      steps: {
+        type: Sequelize.JSONB,
+        defaultValue: []
+      },
+      metadata: {
+        type: Sequelize.JSONB,
+        defaultValue: {}
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      updated_by: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 9. Schedule collection
-    await db.createCollection("schedules", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["scheduleId", "contentId", "status", "scheduledTime"],
-          properties: {
-            scheduleId: { bsonType: "string" },
-            contentId: { bsonType: "string" },
-            status: { bsonType: "string", enum: ["scheduled", "published", "failed", "cancelled"] },
-            scheduledTime: { bsonType: "date" },
-            actualPublishTime: { bsonType: "date" },
-            publishingPlatform: { bsonType: "string" },
-            publishingDetails: { bsonType: "object" },
-            recurrence: { bsonType: "object" },
-            metadata: { bsonType: "object" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            createdBy: { bsonType: "string" },
-            updatedBy: { bsonType: "string" }
-          }
-        }
+
+    // Create the ApiKey table
+    await queryInterface.createTable('api_keys', {
+      id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      key_id: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      user_id: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      key: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      permissions: {
+        type: Sequelize.ARRAY(Sequelize.STRING),
+        defaultValue: []
+      },
+      expires_at: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      last_used: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      status: {
+        type: Sequelize.STRING,
+        defaultValue: 'active'
+      },
+      created_by: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('NOW()')
       }
     });
-    
-    // 10. Report collection
-    await db.createCollection("reports", {
-      validator: {
-        $jsonSchema: {
-          bsonType: "object",
-          required: ["reportId", "name", "type", "dateRange"],
-          properties: {
-            reportId: { bsonType: "string" },
-            name: { bsonType: "string" },
-            description: { bsonType: "string" },
-            type: { bsonType: "string" },
-            dateRange: {
-              bsonType: "object",
-              required: ["startDate", "endDate"],
-              properties: {
-                startDate: { bsonType: "date" },
-                endDate: { bsonType: "date" }
-              }
-            },
-            filters: { bsonType: "object" },
-            metrics: { bsonType: "array" },
-            data: { bsonType: "object" },
-            format: { bsonType: "string" },
-            status: { bsonType: "string" },
-            generatedBy: { bsonType: "string" },
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" }
-          }
-        }
+
+    // Create the Session table (for express-session with connect-pg-simple)
+    await queryInterface.createTable('sessions', {
+      sid: {
+        type: Sequelize.STRING,
+        primaryKey: true
+      },
+      sess: {
+        type: Sequelize.JSON,
+        allowNull: false
+      },
+      expire: {
+        type: Sequelize.DATE,
+        allowNull: false
       }
     });
+
+    // Create indices for better performance
+    await queryInterface.addIndex('agents', ['agent_id']);
+    await queryInterface.addIndex('agents', ['type']);
+    await queryInterface.addIndex('agents', ['status']);
     
-    // Create indexes
-    await db.collection('agents').createIndex({ agentId: 1 }, { unique: true });
-    await db.collection('agents').createIndex({ type: 1 });
-    await db.collection('agents').createIndex({ status: 1 });
+    await queryInterface.addIndex('users', ['user_id']);
+    await queryInterface.addIndex('users', ['email']);
+    await queryInterface.addIndex('users', ['status']);
     
-    await db.collection('contents').createIndex({ contentId: 1 }, { unique: true });
-    await db.collection('contents').createIndex({ slug: 1 }, { unique: true });
-    await db.collection('contents').createIndex({ contentType: 1 });
-    await db.collection('contents').createIndex({ status: 1 });
-    await db.collection('contents').createIndex({ workflowStatus: 1 });
-    await db.collection('contents').createIndex({ keywords: 1 });
-    await db.collection('contents').createIndex({ categories: 1 });
-    await db.collection('contents').createIndex({ tags: 1 });
-    await db.collection('contents').createIndex({ brief: 1 });
+    await queryInterface.addIndex('contents', ['content_id']);
+    await queryInterface.addIndex('contents', ['brief_id']);
+    await queryInterface.addIndex('contents', ['type']);
+    await queryInterface.addIndex('contents', ['status']);
+    await queryInterface.addIndex('contents', ['created_at']);
     
-    await db.collection('contentversions').createIndex({ contentId: 1, versionNumber: 1 }, { unique: true });
+    await queryInterface.addIndex('content_versions', ['content_id']);
     
-    await db.collection('briefs').createIndex({ briefId: 1 }, { unique: true });
-    await db.collection('briefs').createIndex({ contentType: 1 });
-    await db.collection('briefs').createIndex({ status: 1 });
-    await db.collection('briefs').createIndex({ deadline: 1 });
-    await db.collection('briefs').createIndex({ assignedTo: 1 });
+    await queryInterface.addIndex('briefs', ['brief_id']);
+    await queryInterface.addIndex('briefs', ['status']);
+    await queryInterface.addIndex('briefs', ['content_type']);
     
-    await db.collection('metrics').createIndex({ metricId: 1 }, { unique: true });
-    await db.collection('metrics').createIndex({ contentId: 1 });
-    await db.collection('metrics').createIndex({ metricType: 1 });
-    await db.collection('metrics').createIndex({ timestamp: 1 });
+    await queryInterface.addIndex('metrics', ['performance_id']);
+    await queryInterface.addIndex('metrics', ['content_id']);
     
-    await db.collection('brandguidelines').createIndex({ guidelineId: 1, version: 1 }, { unique: true });
+    await queryInterface.addIndex('brand_guidelines', ['guideline_id']);
     
-    await db.collection('users').createIndex({ userId: 1 }, { unique: true });
-    await db.collection('users').createIndex({ email: 1 }, { unique: true });
-    await db.collection('users').createIndex({ roles: 1 });
-    await db.collection('users').createIndex({ status: 1 });
+    await queryInterface.addIndex('workflows', ['workflow_id']);
+    await queryInterface.addIndex('workflows', ['content_id']);
+    await queryInterface.addIndex('workflows', ['brief_id']);
+    await queryInterface.addIndex('workflows', ['status']);
+    await queryInterface.addIndex('workflows', ['type']);
     
-    await db.collection('workflows').createIndex({ workflowId: 1 }, { unique: true });
-    await db.collection('workflows').createIndex({ status: 1 });
-    await db.collection('workflows').createIndex({ contentTypes: 1 });
+    await queryInterface.addIndex('api_keys', ['key_id']);
+    await queryInterface.addIndex('api_keys', ['user_id']);
+    await queryInterface.addIndex('api_keys', ['key']);
     
-    await db.collection('schedules').createIndex({ scheduleId: 1 }, { unique: true });
-    await db.collection('schedules').createIndex({ contentId: 1 });
-    await db.collection('schedules').createIndex({ status: 1 });
-    await db.collection('schedules').createIndex({ scheduledTime: 1 });
-    
-    await db.collection('reports').createIndex({ reportId: 1 }, { unique: true });
-    await db.collection('reports').createIndex({ type: 1 });
-    await db.collection('reports').createIndex({ 'dateRange.startDate': 1, 'dateRange.endDate': 1 });
-    await db.collection('reports').createIndex({ status: 1 });
+    await queryInterface.addIndex('sessions', ['expire']);
   },
 
-  async down(db, client) {
-    // Drop all collections created in the up method
-    await db.collection('agents').drop();
-    await db.collection('contents').drop();
-    await db.collection('contentversions').drop();
-    await db.collection('briefs').drop();
-    await db.collection('metrics').drop();
-    await db.collection('brandguidelines').drop();
-    await db.collection('users').drop();
-    await db.collection('workflows').drop();
-    await db.collection('schedules').drop();
-    await db.collection('reports').drop();
+  async down(queryInterface, Sequelize) {
+    // Drop all tables in reverse order of creation
+    await queryInterface.dropTable('sessions');
+    await queryInterface.dropTable('api_keys');
+    await queryInterface.dropTable('workflows');
+    await queryInterface.dropTable('brand_guidelines');
+    await queryInterface.dropTable('metrics');
+    await queryInterface.dropTable('briefs');
+    await queryInterface.dropTable('content_versions');
+    await queryInterface.dropTable('contents');
+    await queryInterface.dropTable('users');
+    await queryInterface.dropTable('agents');
   }
 };

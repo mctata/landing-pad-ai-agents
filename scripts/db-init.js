@@ -1,22 +1,32 @@
 /**
  * Database initialization script for Landing Pad Digital AI Content Agents
  * 
- * This script initializes the MongoDB database with the necessary collections,
- * indices, and default data for the AI agent system using Mongoose models.
+ * This script initializes the PostgreSQL database with the necessary tables,
+ * indices, and default data for the AI agent system using Sequelize models.
  * 
  * It also applies any pending migrations to ensure the database schema is up to date.
  */
 
 require('dotenv').config();
-const mongoose = require('mongoose');
+const { Sequelize } = require('sequelize');
 const models = require('../src/models');
-const MigrationService = require('../src/common/services/migrationService');
+const fs = require('fs');
+const path = require('path');
+const { promisify } = require('util');
+const readFile = promisify(fs.readFile);
+const logger = require('../src/common/services/logger').createLogger('db-init');
+const { execSync } = require('child_process');
 
-// Initialize the migration service
-const migrationService = new MigrationService();
-
-// Get MongoDB connection string from environment variables
-const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/landing_pad_ai_agents';
+// Get PostgreSQL connection info from environment variables
+const dbConfig = {
+  username: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'password',
+  database: process.env.DB_NAME || 'agents_db',
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432', 10),
+  dialect: 'postgres',
+  logging: msg => logger.debug(msg)
+};
 
 // Define default agents
 const defaultAgents = [
@@ -248,61 +258,80 @@ const adminUser = {
  * Initialize the database
  */
 async function initializeDatabase() {
+  let sequelize = null;
+  
   try {
-    // Connect to MongoDB
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    console.log('Connected to MongoDB successfully');
+    // Connect to PostgreSQL
+    console.log('Connecting to PostgreSQL...');
+    sequelize = new Sequelize(dbConfig);
+    await sequelize.authenticate();
+    console.log('Connected to PostgreSQL successfully');
     
-    // Apply any pending migrations
-    console.log('Checking for pending migrations...');
-    await migrationService.initialize();
-    const migrationStatus = await migrationService.status();
-    const pendingMigrations = migrationStatus.filter(m => !m.appliedAt);
-    
-    if (pendingMigrations.length > 0) {
-      console.log(`Found ${pendingMigrations.length} pending migrations. Applying...`);
-      const appliedMigrations = await migrationService.up();
-      
-      if (appliedMigrations.length > 0) {
-        console.log(`Successfully applied ${appliedMigrations.length} migrations: ${appliedMigrations.join(', ')}`);
-      } else {
-        console.log('No migrations were applied. This may indicate an issue with the migration process.');
-      }
-    } else {
-      console.log('No pending migrations found. Database schema is up to date.');
+    // Check if migrations directory exists
+    const migrationsDir = path.resolve(process.cwd(), 'migrations/scripts');
+    if (!fs.existsSync(migrationsDir)) {
+      console.log('Creating migrations directory...');
+      fs.mkdirSync(migrationsDir, { recursive: true });
     }
     
+    // Apply schema migrations
+    console.log('Applying schema migrations...');
+    try {
+      execSync('npx sequelize-cli db:migrate', { stdio: 'inherit' });
+      console.log('Migrations applied successfully');
+    } catch (migrationError) {
+      console.error('Error applying migrations:', migrationError.message);
+      console.log('Continuing with database initialization...');
+    }
+    
+    // Sync models with database
+    console.log('Syncing models with database...');
+    for (const modelName in models) {
+      if (typeof models[modelName].init === 'function') {
+        models[modelName].init(sequelize);
+      }
+    }
+    
+    // Create associations between models
+    for (const modelName in models) {
+      if (typeof models[modelName].associate === 'function') {
+        models[modelName].associate(models);
+      }
+    }
+    
+    // Sync models with database (this will create tables if they don't exist)
+    await sequelize.sync({ alter: true });
+    console.log('Models synced with database');
+    
     // Insert default agents
-    console.log('Checking if agents collection has data...');
-    const agentCount = await models.Agent.countDocuments();
+    console.log('Checking if agents table has data...');
+    const agentCount = await models.Agent.count();
     
     if (agentCount === 0) {
       console.log('Inserting default agents...');
-      await models.Agent.insertMany(defaultAgents);
+      await models.Agent.bulkCreate(defaultAgents);
       console.log(`${defaultAgents.length} agents inserted`);
     } else {
-      console.log('Agents collection already has data, skipping...');
+      console.log('Agents table already has data, skipping...');
     }
     
     // Insert default brand guidelines
-    console.log('Checking if brand guidelines collection has data...');
-    const brandGuidelineCount = await models.BrandGuideline.countDocuments();
+    console.log('Checking if brand guidelines table has data...');
+    const brandGuidelineCount = await models.BrandGuideline.count();
     
     if (brandGuidelineCount === 0) {
       console.log('Inserting default brand guidelines...');
       await models.BrandGuideline.create(defaultBrandGuidelines);
       console.log('Brand guidelines inserted');
     } else {
-      console.log('Brand guidelines collection already has data, skipping...');
+      console.log('Brand guidelines table already has data, skipping...');
     }
     
     // Insert admin user
-    console.log('Checking if users collection has admin user...');
-    const adminExists = await models.User.findOne({ email: adminUser.email });
+    console.log('Checking if users table has admin user...');
+    const adminExists = await models.User.findOne({
+      where: { email: adminUser.email }
+    });
     
     if (!adminExists) {
       console.log('Creating admin user...');
@@ -317,14 +346,11 @@ async function initializeDatabase() {
     console.error('Database initialization failed:', error);
     process.exit(1);
   } finally {
-    // Close the migration service
-    if (migrationService) {
-      await migrationService.close();
+    // Close the database connection
+    if (sequelize) {
+      await sequelize.close();
+      console.log('Database connection closed');
     }
-    
-    // Close the mongoose connection
-    await mongoose.connection.close();
-    console.log('Database connections closed');
   }
 }
 

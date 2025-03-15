@@ -23,10 +23,11 @@ These agents work together through a shared message bus and knowledge repository
 ### Prerequisites
 
 - Node.js 18.x or higher
-- MongoDB 6.0 or higher
+- PostgreSQL 14.0 or higher
 - RabbitMQ 3.10 or higher
 - Python 3.10 or higher (for analytics components)
 - API keys for AI services (Anthropic Claude and OpenAI)
+- AWS account for S3 storage (for production)
 
 ### Installing Prerequisites
 
@@ -71,50 +72,49 @@ npm --version
    npm --version
    ```
 
-#### 2. MongoDB
+#### 2. PostgreSQL
 
 **On Ubuntu/Debian:**
 ```bash
-# Import MongoDB public GPG key
-wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
+# Add PostgreSQL repository
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 
-# Create list file for MongoDB
-echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
-
-# Reload local package database
+# Update package lists
 sudo apt-get update
 
-# Install MongoDB packages
-sudo apt-get install -y mongodb-org
+# Install PostgreSQL and development libraries
+sudo apt-get install -y postgresql-14 postgresql-contrib-14 libpq-dev
 
-# Start MongoDB service
-sudo systemctl start mongod
-
-# Enable MongoDB to start on boot
-sudo systemctl enable mongod
+# Start PostgreSQL service
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 
 # Verify installation
-mongod --version
+psql --version
 ```
 
 **On macOS (using Homebrew):**
 ```bash
-# Install MongoDB
-brew tap mongodb/brew
-brew install mongodb-community@6.0
+# Install PostgreSQL
+brew install postgresql@14
 
-# Start MongoDB service
-brew services start mongodb-community@6.0
+# Start PostgreSQL service
+brew services start postgresql@14
 
 # Verify installation
-mongod --version
+psql --version
 ```
 
 **On Windows:**
-1. Download the MongoDB Community Server installer from [MongoDB Download Center](https://www.mongodb.com/try/download/community)
+1. Download the PostgreSQL installer from [PostgreSQL Download Page](https://www.postgresql.org/download/windows/)
 2. Run the installer and follow the installation wizard
-3. Choose "Complete" installation and select "Install MongoDB as a Service"
-4. Verify installation by opening MongoDB Compass (installed with MongoDB)
+3. Choose components to install (PostgreSQL Server, pgAdmin 4, Command Line Tools)
+4. Set a password for the postgres user
+5. Verify installation by opening pgAdmin or using the following in Command Prompt:
+   ```
+   psql -V
+   ```
 
 #### 3. RabbitMQ
 
@@ -191,7 +191,38 @@ python3.10 --version
    python --version
    ```
 
-#### 5. AI API Keys
+#### 5. AWS S3 (for production storage)
+
+1. Sign up for an AWS account if you don't have one at [aws.amazon.com](https://aws.amazon.com/)
+2. Create an IAM user with programmatic access:
+   - Open the IAM console in AWS
+   - Navigate to Users and click "Add user"
+   - Set a username (e.g., "landing-pad-ai-agents")
+   - Select "Programmatic access"
+   - Attach the "AmazonS3FullAccess" policy (or create a custom policy with restricted permissions)
+   - Complete the user creation process
+   - Save the Access Key ID and Secret Access Key securely
+
+3. Configure AWS credentials locally:
+   ```bash
+   # Install AWS CLI
+   pip install awscli
+
+   # Configure with your credentials
+   aws configure
+   # Enter Access Key ID, Secret Access Key, default region (us-east-1), and output format (json)
+   ```
+
+4. Verify S3 access:
+   ```bash
+   aws s3 ls
+   ```
+
+The project is configured to use these S3 buckets:
+- Production: s3://landing-pad-ai-agents/
+- Development: s3://landing-pad-ai-agents-dev/
+
+#### 6. AI API Keys
 
 1. **Anthropic Claude API Key**:
    - Sign up for an account at [Anthropic's website](https://www.anthropic.com/)
@@ -226,11 +257,25 @@ python3.10 --version
 
    Essential settings to configure in your `.env` file:
    ```
-   # MongoDB Connection
-   MONGODB_URI=mongodb://localhost:27017/landing_pad_ai_agents
+   # PostgreSQL Connection
+   DATABASE_URL=postgres://postgres:password@localhost:5432/agents_db
+   DB_USER=postgres
+   DB_PASSWORD=password
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=agents_db
    
-   # RabbitMQ Connection
-   RABBITMQ_URI=amqp://localhost
+   # Redis Connection (for caching)
+   REDIS_LOCAL_URL=redis://localhost:6379
+   
+   # S3 Storage Configuration
+   S3_BUCKET_DEV=landing-pad-ai-agents-dev
+   S3_REGION=us-east-1
+   S3_STORAGE_PREFIX=storage
+   S3_UPLOADS_PREFIX=uploads
+   
+   # Message Queue Configuration
+   RABBITMQ_URL=amqp://localhost
    
    # AI Service API Keys
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
@@ -239,10 +284,28 @@ python3.10 --version
    # Application Settings
    NODE_ENV=development
    PORT=3000
-   LOG_LEVEL=info
+   HOST=localhost
    ```
 
-4. Initialize the database:
+4. Create PostgreSQL database locally:
+   ```bash
+   # Log into PostgreSQL
+   sudo -u postgres psql
+
+   # Create the database
+   CREATE DATABASE agents_db;
+
+   # Create a user (if needed)
+   CREATE USER your_username WITH PASSWORD 'your_password';
+
+   # Grant privileges
+   GRANT ALL PRIVILEGES ON DATABASE agents_db TO your_username;
+
+   # Exit
+   \q
+   ```
+
+5. Initialize the database:
    ```bash
    npm run db:init
    ```
@@ -403,7 +466,9 @@ These examples demonstrate the capabilities of the agent system and provide temp
 - **Agent Unresponsive**: Verify agent process is running and check logs
 - **Content Generation Failed**: Ensure AI models are accessible and API keys are valid
 - **Performance Data Missing**: Check analytics integration configurations
-- **Database Connection Issues**: Verify MongoDB is running with `mongo --eval "db.serverStatus()"`
+- **Database Connection Issues**: Verify PostgreSQL is running with `pg_isready -h localhost -p 5432`
+- **S3 Storage Issues**: Check AWS credentials with `aws sts get-caller-identity`
+- **Redis Connection Issues**: Check Redis connection with `redis-cli ping`
 
 ### Logging
 
