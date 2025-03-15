@@ -7,13 +7,26 @@
  * It also applies any pending migrations to ensure the database schema is up to date.
  */
 
-require('dotenv').config();
-const { Sequelize } = require('sequelize');
-const models = require('../src/models');
+try {
+  require('dotenv').config();
+} catch (err) {
+  console.error('Error loading dotenv. Make sure the package is installed:', err);
+  process.exit(1);
+}
 const fs = require('fs');
 const path = require('path');
-const winston = require('winston');
 const { execSync } = require('child_process');
+
+// Try to load sequelize and other dependencies
+let Sequelize, winston, models;
+try {
+  Sequelize = require('sequelize');
+  winston = require('winston');
+  models = require('../src/models');
+} catch (err) {
+  console.error('Error loading dependencies. Try running: npm install', err);
+  process.exit(1);
+}
 
 // Create a logger for this script
 const logger = winston.createLogger({
