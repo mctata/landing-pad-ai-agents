@@ -23,7 +23,7 @@ These agents work together through a shared message bus and knowledge repository
 ### Prerequisites
 
 - Node.js 18.x or higher
-- PostgreSQL 14.0 or higher
+- PostgreSQL 17.0 or higher
 - RabbitMQ 3.10 or higher
 - Python 3.10 or higher (for analytics components)
 - API keys for AI services (Anthropic Claude and OpenAI)
@@ -84,7 +84,7 @@ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-
 sudo apt-get update
 
 # Install PostgreSQL and development libraries
-sudo apt-get install -y postgresql-14 postgresql-contrib-14 libpq-dev
+sudo apt-get install -y postgresql-17 postgresql-contrib-17 libpq-dev
 
 # Start PostgreSQL service
 sudo systemctl start postgresql
@@ -97,10 +97,10 @@ psql --version
 **On macOS (using Homebrew):**
 ```bash
 # Install PostgreSQL
-brew install postgresql@14
+brew install postgresql@17
 
 # Start PostgreSQL service
-brew services start postgresql@14
+brew services start postgresql@17
 
 # Verify installation
 psql --version

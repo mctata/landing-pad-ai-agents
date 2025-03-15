@@ -1,8 +1,8 @@
-# Migration from MongoDB to PostgreSQL and S3 Storage
+# Migration from MongoDB to PostgreSQL 17 and S3 Storage
 
 ## Overview
 
-This document outlines the steps taken to migrate the Landing Pad Digital AI Agents system from MongoDB to PostgreSQL for the database layer, AWS S3 for file storage, and ElastiCache for Redis as the caching layer.
+This document outlines the steps taken to migrate the Landing Pad Digital AI Agents system from MongoDB to PostgreSQL 17 for the database layer, AWS S3 for file storage, and ElastiCache for Redis as the caching layer.
 
 ## Completed Steps
 
