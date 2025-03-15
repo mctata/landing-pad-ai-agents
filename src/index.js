@@ -301,8 +301,8 @@ function initializeWebServer() {
   });
   
   // Start server
-  app.listen(port, () => {
-    logger.info(`Web server running on port ${port}`);
+  app.listen(port, '0.0.0.0', () => {
+    logger.info(`Web server running on port ${port} (0.0.0.0)`);
   });
 }
 
