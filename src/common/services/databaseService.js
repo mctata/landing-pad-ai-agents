@@ -17,13 +17,45 @@ class DatabaseService {
   }
 
   /**
-   * Connect to PostgreSQL
+   * Connect to PostgreSQL with optimized settings
    */
   async connect() {
     try {
       this.logger.info('Connecting to PostgreSQL database...');
       
-      // Create Sequelize instance
+      // Get environment
+      const environment = process.env.NODE_ENV || 'development';
+      
+      // Default pool configuration
+      const poolConfig = {
+        max: environment === 'production' ? 20 : 10,
+        min: environment === 'production' ? 2 : 0,
+        acquire: 30000,
+        idle: environment === 'production' ? 10000 : 10000
+      };
+      
+      // Override with config values if provided
+      if (this.config.pool) {
+        Object.assign(poolConfig, this.config.pool);
+      }
+      
+      // Optimize for production environment
+      const dialectOptions = {
+        ssl: this.config.ssl ? {
+          require: true,
+          rejectUnauthorized: false
+        } : false
+      };
+      
+      // For production, add statement timeout to prevent long-running queries
+      if (environment === 'production') {
+        dialectOptions.statement_timeout = 30000; // 30 seconds
+        
+        // Add application_name for easier identification in pg_stat_activity
+        dialectOptions.application_name = 'landing-pad-ai-agents';
+      }
+      
+      // Create Sequelize instance with optimized settings
       this.sequelize = new Sequelize(
         this.config.database,
         this.config.username,
@@ -33,19 +65,17 @@ class DatabaseService {
           port: this.config.port,
           dialect: 'postgres',
           logging: (msg) => this.logger.debug(msg),
-          pool: {
-            max: 10,
-            min: 0,
-            acquire: 30000,
-            idle: 10000
+          pool: poolConfig,
+          dialectOptions,
+          timezone: '+00:00',
+          // Use query caching in production
+          query: {
+            raw: false,
+            // For high-traffic applications in production, use prepared statements
+            prepared: environment === 'production',
           },
-          dialectOptions: {
-            ssl: this.config.ssl ? {
-              require: true,
-              rejectUnauthorized: false
-            } : false
-          },
-          timezone: '+00:00'
+          // Define replication settings if read replicas are available
+          ...(this.config.replication ? { replication: this.config.replication } : {})
         }
       );
       
@@ -138,25 +168,53 @@ class DatabaseService {
   // =====================================
   
   /**
-   * Create new content
+   * Create new content with transaction support
    * @param {Object} contentData - Content data
+   * @param {Object} options - Additional options (transaction, etc.)
    * @returns {Object} - Created content
    */
-  async createContent(contentData) {
+  async createContent(contentData, options = {}) {
+    let transaction = options.transaction;
+    let managedTransaction = false;
+    
     try {
+      // Start transaction if not provided
+      if (!transaction) {
+        transaction = await this.sequelize.transaction();
+        managedTransaction = true;
+      }
+      
       // Generate contentId if not provided
       if (!contentData.contentId) {
         contentData.contentId = await this.models.Content.generateContentId();
       }
       
-      const content = await this.models.Content.create(contentData);
+      // Create content with transaction
+      const content = await this.models.Content.create(contentData, { 
+        transaction 
+      });
       
-      // Create initial version
-      await this.createContentVersion(content.contentId, content.toJSON(), content.createdBy);
+      // Create initial version with the same transaction
+      await this.createContentVersion(
+        content.contentId, 
+        content.toJSON(), 
+        content.createdBy, 
+        { transaction }
+      );
+      
+      // Commit transaction if we started it
+      if (managedTransaction) {
+        await transaction.commit();
+      }
       
       this.logger.info(`Content created with ID: ${content.contentId}`);
       return content;
     } catch (error) {
+      // Rollback transaction if we started it
+      if (managedTransaction && transaction) {
+        await transaction.rollback();
+      }
+      
       this.logger.error('Error creating content:', error);
       throw error;
     }
@@ -179,59 +237,104 @@ class DatabaseService {
   }
   
   /**
-   * Update content
+   * Update content with transaction support
    * @param {string} contentId - Content ID
    * @param {Object} updateData - Update data
+   * @param {Object} options - Additional options (transaction, etc.)
    * @returns {Object} - Updated content
    */
-  async updateContent(contentId, updateData) {
+  async updateContent(contentId, updateData, options = {}) {
+    let transaction = options.transaction;
+    let managedTransaction = false;
+    
     try {
-      // Get current content to save as a version
-      const content = await this.getContent(contentId);
+      // Start transaction if not provided
+      if (!transaction) {
+        transaction = await this.sequelize.transaction();
+        managedTransaction = true;
+      }
+      
+      // Get current content to save as a version, with transaction
+      const content = await this.models.Content.findOne({ 
+        where: { contentId },
+        transaction 
+      });
+      
       if (!content) {
+        // Roll back transaction if we started it
+        if (managedTransaction) {
+          await transaction.rollback();
+        }
         throw new Error(`Content with ID ${contentId} not found`);
       }
       
       // Save current state as a version (before applying updates)
-      await this.createContentVersion(contentId, content.toJSON(), updateData.updatedBy || 'system');
+      await this.createContentVersion(
+        contentId, 
+        content.toJSON(), 
+        updateData.updatedBy || 'system',
+        { transaction }
+      );
       
-      // Update content
-      await content.update(updateData);
+      // Update content with transaction
+      await content.update(updateData, { transaction });
       
-      this.logger.info(`Content ${contentId} updated from "${content.title}" to "${content.title}"`);
+      // Commit transaction if we started it
+      if (managedTransaction) {
+        await transaction.commit();
+      }
+      
+      this.logger.info(`Content ${contentId} updated`);
       return content;
     } catch (error) {
+      // Rollback transaction if we started it
+      if (managedTransaction && transaction) {
+        await transaction.rollback();
+      }
+      
       this.logger.error(`Error updating content ${contentId}:`, error);
       throw error;
     }
   }
   
   /**
-   * Create content version
+   * Create content version with transaction support
    * @param {string} contentId - Content ID
    * @param {Object} contentData - Content data
    * @param {string} createdBy - User who created the version
+   * @param {Object} options - Additional options (transaction, etc.)
    * @returns {Object} - Content version
    */
-  async createContentVersion(contentId, contentData, createdBy) {
+  async createContentVersion(contentId, contentData, createdBy, options = {}) {
+    const transaction = options.transaction;
+    
     try {
       // Find the latest version and increment it
-      let version = 1;
-      const latestVersion = await this.models.ContentVersion.findOne({
+      const findOptions = {
         where: { contentId },
         order: [['version', 'DESC']]
-      });
+      };
+      
+      // Add transaction if provided
+      if (transaction) findOptions.transaction = transaction;
+      
+      let version = 1;
+      const latestVersion = await this.models.ContentVersion.findOne(findOptions);
       
       if (latestVersion) {
         version = latestVersion.version + 1;
       }
+      
+      // Create options for the new version
+      const createOptions = {};
+      if (transaction) createOptions.transaction = transaction;
       
       const contentVersion = await this.models.ContentVersion.create({
         contentId,
         version,
         data: contentData,
         createdBy
-      });
+      }, createOptions);
       
       this.logger.info(`Created version ${version} for content ${contentId}`);
       return contentVersion;
@@ -288,12 +391,14 @@ class DatabaseService {
   }
   
   /**
-   * Search content
+   * Search content using PostgreSQL full-text search and advanced filtering
    * @param {Object} query - Search query
    * @param {Object} options - Search options
    * @returns {Object} - Search results with pagination
    */
   async searchContent(query = {}, options = {}) {
+    const transaction = options.transaction;
+    
     try {
       const {
         type,
@@ -307,47 +412,90 @@ class DatabaseService {
         searchText,
         sort = { createdAt: 'DESC' },
         page = 1,
-        limit = 20
+        limit = 20,
+        includeVersions = false,
+        includeAuthor = false
       } = query;
       
       // Build where clause
       const where = {};
       
-      if (type) where.type = type;
-      if (status) where.status = status;
+      if (type) {
+        // Handle multiple types
+        if (Array.isArray(type)) {
+          where.type = { [Sequelize.Op.in]: type };
+        } else {
+          where.type = type;
+        }
+      }
+      
+      if (status) {
+        // Handle multiple statuses
+        if (Array.isArray(status)) {
+          where.status = { [Sequelize.Op.in]: status };
+        } else {
+          where.status = status;
+        }
+      }
+      
       if (createdBy) where.createdBy = createdBy;
       if (updatedBy) where.updatedBy = updatedBy;
       
       // Date range
       if (dateFrom || dateTo) {
         where.createdAt = {};
-        if (dateFrom) where.createdAt.$gte = new Date(dateFrom);
-        if (dateTo) where.createdAt.$lte = new Date(dateTo);
+        if (dateFrom) where.createdAt[Sequelize.Op.gte] = new Date(dateFrom);
+        if (dateTo) where.createdAt[Sequelize.Op.lte] = new Date(dateTo);
       }
       
-      // Categories and tags in Sequelize need to be handled with associations or JSON operators
-      // This is a simple example assuming categories and tags are stored as arrays in JSON fields
+      // Handle categories - using PostgreSQL array operators
       if (categories) {
-        where.categories = Sequelize.fn('JSON_CONTAINS', 
-          Sequelize.col('categories'), 
-          JSON.stringify(Array.isArray(categories) ? categories : [categories])
+        const categoryArray = Array.isArray(categories) ? categories : [categories];
+        where[Sequelize.Op.and] = categoryArray.map(category => 
+          Sequelize.literal(`'${category}' = ANY(categories)`)
         );
       }
       
+      // Handle tags - using PostgreSQL array operators
       if (tags) {
-        where.tags = Sequelize.fn('JSON_CONTAINS', 
-          Sequelize.col('tags'), 
-          JSON.stringify(Array.isArray(tags) ? tags : [tags])
+        const tagArray = Array.isArray(tags) ? tags : [tags];
+        where[Sequelize.Op.and] = (where[Sequelize.Op.and] || []).concat(
+          tagArray.map(tag => Sequelize.literal(`'${tag}' = ANY(tags)`))
         );
       }
       
-      // For text search, we use ILIKE for PostgreSQL
+      // For text search, we use PostgreSQL full-text search
       if (searchText) {
-        where.$or = [
-          { title: { [Sequelize.Op.iLike]: `%${searchText}%` } },
-          { description: { [Sequelize.Op.iLike]: `%${searchText}%` } },
-          { content: { [Sequelize.Op.iLike]: `%${searchText}%` } }
-        ];
+        // Create a PostgreSQL tsquery from the search text
+        const tsquery = searchText
+          .trim()
+          .split(/\s+/)
+          .map(term => `${term}:*`)
+          .join(' & ');
+        
+        // Add the full-text search condition to the where clause
+        where[Sequelize.Op.and] = [
+          Sequelize.literal(`search_vector @@ to_tsquery('english', '${tsquery}')`)
+        ].concat(where[Sequelize.Op.and] || []);
+      }
+      
+      // Setup includes for related models
+      const include = [];
+      
+      if (includeAuthor) {
+        include.push({
+          model: this.models.User,
+          as: 'author',
+          attributes: ['userId', 'name', 'email', 'profilePicture']
+        });
+      }
+      
+      if (includeVersions) {
+        include.push({
+          model: this.models.ContentVersion,
+          limit: 5,
+          order: [['version', 'DESC']]
+        });
       }
       
       // Execute query with pagination
@@ -355,20 +503,45 @@ class DatabaseService {
       
       // Convert sort to sequelize format
       const order = [];
+      
+      // If using full-text search, add rank ordering
+      if (searchText) {
+        const tsquery = searchText
+          .trim()
+          .split(/\s+/)
+          .map(term => `${term}:*`)
+          .join(' & ');
+          
+        order.push([
+          Sequelize.literal(`ts_rank(search_vector, to_tsquery('english', '${tsquery}'))`),
+          'DESC'
+        ]);
+      }
+      
+      // Add other sort fields
       for (const [field, direction] of Object.entries(sort)) {
         order.push([field, direction]);
       }
       
-      // Get total count
-      const total = await this.models.Content.count({ where });
+      // Get total count with the transaction if provided
+      const countOptions = { where };
+      if (transaction) countOptions.transaction = transaction;
+      const total = await this.models.Content.count(countOptions);
       
-      // Get results
-      const contents = await this.models.Content.findAll({
+      // Query options
+      const queryOptions = {
         where,
         order,
         offset,
-        limit
-      });
+        limit,
+        include
+      };
+      
+      // Add transaction if provided
+      if (transaction) queryOptions.transaction = transaction;
+      
+      // Get results
+      const contents = await this.models.Content.findAll(queryOptions);
       
       return {
         contents,
@@ -793,40 +966,290 @@ class DatabaseService {
   }
   
   /**
-   * Update workflow step
+   * Get workflow steps
    * @param {string} workflowId - Workflow ID
+   * @param {Object} options - Additional options
+   * @returns {Array} - Workflow steps
+   */
+  async getWorkflowSteps(workflowId, options = {}) {
+    const transaction = options.transaction;
+    
+    try {
+      const findOptions = {
+        where: { workflowId },
+        order: [['order', 'ASC']]
+      };
+      
+      if (transaction) findOptions.transaction = transaction;
+      
+      return await this.models.WorkflowStep.findAll(findOptions);
+    } catch (error) {
+      this.logger.error(`Error getting workflow steps for ${workflowId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get workflow step
+   * @param {string} stepId - Step ID
+   * @param {Object} options - Additional options
+   * @returns {Object} - Workflow step
+   */
+  async getWorkflowStep(stepId, options = {}) {
+    const transaction = options.transaction;
+    
+    try {
+      const findOptions = {
+        where: { stepId }
+      };
+      
+      if (transaction) findOptions.transaction = transaction;
+      
+      return await this.models.WorkflowStep.findOne(findOptions);
+    } catch (error) {
+      this.logger.error(`Error getting workflow step ${stepId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Create workflow step
+   * @param {Object} stepData - Step data
+   * @param {Object} options - Additional options
+   * @returns {Object} - Created workflow step
+   */
+  async createWorkflowStep(stepData, options = {}) {
+    const transaction = options.transaction;
+    let managedTransaction = false;
+    
+    try {
+      // Start transaction if not provided
+      if (!transaction) {
+        transaction = await this.sequelize.transaction();
+        managedTransaction = true;
+      }
+      
+      // Generate stepId if not provided
+      if (!stepData.stepId) {
+        stepData.stepId = await this.models.WorkflowStep.generateStepId();
+      }
+      
+      // Create step with transaction
+      const step = await this.models.WorkflowStep.create(stepData, {
+        transaction
+      });
+      
+      // Update workflow's currentStepId if this is the first step
+      const workflow = await this.models.Workflow.findOne({
+        where: { workflowId: stepData.workflowId },
+        transaction
+      });
+      
+      if (workflow && !workflow.currentStepId) {
+        await workflow.update({ currentStepId: step.stepId }, { transaction });
+      }
+      
+      // Commit transaction if we started it
+      if (managedTransaction) {
+        await transaction.commit();
+      }
+      
+      this.logger.info(`Workflow step created with ID: ${step.stepId}`);
+      return step;
+    } catch (error) {
+      // Rollback transaction if we started it
+      if (managedTransaction && transaction) {
+        await transaction.rollback();
+      }
+      
+      this.logger.error('Error creating workflow step:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Update workflow step
    * @param {string} stepId - Step ID
    * @param {Object} updateData - Update data
-   * @returns {Object} - Updated workflow
+   * @param {Object} options - Additional options
+   * @returns {Object} - Updated workflow step
    */
-  async updateWorkflowStep(workflowId, stepId, updateData) {
+  async updateWorkflowStep(stepId, updateData, options = {}) {
+    const transaction = options.transaction;
+    let managedTransaction = false;
+    
     try {
-      const workflow = await this.getWorkflow(workflowId);
-      
-      if (!workflow) {
-        throw new Error(`Workflow with ID ${workflowId} not found`);
+      // Start transaction if not provided
+      if (!transaction) {
+        transaction = await this.sequelize.transaction();
+        managedTransaction = true;
       }
       
-      // In a relational database, the steps would typically be in a separate table
-      // For now, we'll assume the workflow model includes a steps JSON array
-      const steps = workflow.steps || [];
-      const stepIndex = steps.findIndex(step => step.stepId === stepId);
+      // Get step with transaction
+      const step = await this.models.WorkflowStep.findOne({
+        where: { stepId },
+        transaction
+      });
       
-      if (stepIndex === -1) {
-        throw new Error(`Step with ID ${stepId} not found in workflow ${workflowId}`);
+      if (!step) {
+        // Roll back transaction if we started it
+        if (managedTransaction) {
+          await transaction.rollback();
+        }
+        throw new Error(`Step with ID ${stepId} not found`);
       }
       
-      // Update step fields - this is doing a partial update of a JSON field in PostgreSQL
-      // The exact SQL will depend on how the model is structured
-      steps[stepIndex] = { ...steps[stepIndex], ...updateData };
+      // Update step with transaction
+      await step.update(updateData, { transaction });
       
-      // Save the updated workflow
-      await workflow.update({ steps });
+      // Update workflow if the step was completed and there are next steps
+      if (updateData.status === 'completed') {
+        const workflow = await this.models.Workflow.findOne({
+          where: { workflowId: step.workflowId },
+          transaction
+        });
+        
+        if (workflow) {
+          // Find the next step
+          const nextStep = await this.models.WorkflowStep.findOne({
+            where: {
+              workflowId: step.workflowId,
+              order: { [Sequelize.Op.gt]: step.order }
+            },
+            order: [['order', 'ASC']],
+            transaction
+          });
+          
+          if (nextStep) {
+            // Update workflow to point to the next step
+            await workflow.update({ 
+              currentStepId: nextStep.stepId,
+              status: 'in_progress'
+            }, { transaction });
+          } else {
+            // No more steps, workflow is completed
+            await workflow.update({ 
+              status: 'completed',
+              completedAt: new Date(),
+              duration: workflow.startedAt ? 
+                Math.floor((Date.now() - workflow.startedAt.getTime()) / 1000) : null
+            }, { transaction });
+          }
+        }
+      }
       
-      this.logger.info(`Workflow ${workflowId} step ${stepId} updated`);
-      return workflow;
+      // Commit transaction if we started it
+      if (managedTransaction) {
+        await transaction.commit();
+      }
+      
+      this.logger.info(`Workflow step ${stepId} updated`);
+      return step;
     } catch (error) {
-      this.logger.error(`Error updating workflow ${workflowId} step ${stepId}:`, error);
+      // Rollback transaction if we started it
+      if (managedTransaction && transaction) {
+        await transaction.rollback();
+      }
+      
+      this.logger.error(`Error updating workflow step ${stepId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get current workflow step
+   * @param {string} workflowId - Workflow ID
+   * @param {Object} options - Additional options
+   * @returns {Object} - Current workflow step
+   */
+  async getCurrentWorkflowStep(workflowId, options = {}) {
+    const transaction = options.transaction;
+    
+    try {
+      // Get workflow to find current step ID
+      const workflow = await this.models.Workflow.findOne({
+        where: { workflowId },
+        transaction
+      });
+      
+      if (!workflow || !workflow.currentStepId) {
+        return null;
+      }
+      
+      // Get current step
+      return await this.models.WorkflowStep.findOne({
+        where: { stepId: workflow.currentStepId },
+        transaction
+      });
+    } catch (error) {
+      this.logger.error(`Error getting current workflow step for ${workflowId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Migrate workflow steps from JSON to relational model
+   * @param {string} workflowId - Workflow ID
+   * @returns {boolean} - Success status
+   */
+  async migrateWorkflowSteps(workflowId) {
+    let transaction;
+    
+    try {
+      transaction = await this.sequelize.transaction();
+      
+      // Get workflow with transaction
+      const workflow = await this.models.Workflow.findOne({
+        where: { workflowId },
+        transaction
+      });
+      
+      if (!workflow || !workflow.steps || !Array.isArray(workflow.steps) || workflow.steps.length === 0) {
+        await transaction.rollback();
+        return false;
+      }
+      
+      // Migrate each step to the new model
+      for (let i = 0; i < workflow.steps.length; i++) {
+        const oldStep = workflow.steps[i];
+        const newStep = {
+          stepId: oldStep.stepId || await this.models.WorkflowStep.generateStepId(),
+          workflowId: workflow.workflowId,
+          name: oldStep.name || `Step ${i + 1}`,
+          description: oldStep.description,
+          type: oldStep.type || 'automatic',
+          status: oldStep.status || 'pending',
+          order: i,
+          config: oldStep.config || {},
+          result: oldStep.result || null,
+          assignedTo: oldStep.assignedTo,
+          startedAt: oldStep.startedAt,
+          completedAt: oldStep.completedAt,
+          createdBy: workflow.createdBy,
+          updatedBy: workflow.updatedBy
+        };
+        
+        await this.models.WorkflowStep.create(newStep, { transaction });
+        
+        // If this is the current step, update workflow's currentStepId
+        if (i === workflow.currentStep) {
+          await workflow.update({ currentStepId: newStep.stepId }, { transaction });
+        }
+      }
+      
+      // Mark steps as migrated by setting a flag in metadata
+      const metadata = workflow.metadata || {};
+      metadata.stepsMigrated = true;
+      await workflow.update({ metadata }, { transaction });
+      
+      await transaction.commit();
+      
+      this.logger.info(`Migrated ${workflow.steps.length} steps for workflow ${workflowId}`);
+      return true;
+    } catch (error) {
+      if (transaction) await transaction.rollback();
+      
+      this.logger.error(`Error migrating workflow steps for ${workflowId}:`, error);
       throw error;
     }
   }

@@ -11,6 +11,7 @@ const Brief = require('./briefModel');
 const Metric = require('./metricModel');
 const BrandGuideline = require('./brandGuidelineModel');
 const Workflow = require('./workflowModel');
+const WorkflowStep = require('./workflowStepModel');
 const Agent = require('./agentModel');
 const Schedule = require('./scheduleModel');
 const Report = require('./reportModel');
@@ -25,6 +26,7 @@ module.exports = {
   Metric,
   BrandGuideline,
   Workflow,
+  WorkflowStep,
   Agent,
   Schedule,
   Report,

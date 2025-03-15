@@ -89,6 +89,10 @@ class Content extends BaseModel {
     publishedAt: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    search_vector: {
+      type: DataTypes.TSVECTOR,
+      allowNull: true
     }
   };
 
@@ -97,7 +101,7 @@ class Content extends BaseModel {
     tableName: 'contents',
     timestamps: true,
     hooks: {
-      beforeSave: (content) => {
+      beforeSave: async (content, options) => {
         // Update version number on save
         if (content.changed() && !content.isNewRecord) {
           content.version += 1;
@@ -109,6 +113,59 @@ class Content extends BaseModel {
             .toLowerCase()
             .replace(/[^\w ]+/g, '')
             .replace(/ +/g, '-');
+        }
+        
+        // Update search vector for full-text search
+        if (content.changed('title') || content.changed('content') || content.changed('meta_description') || 
+            content.changed('keywords') || content.changed('categories') || content.changed('tags') || 
+            content.isNewRecord) {
+          
+          // Extract text from JSONB content if it's a string or has specific text fields
+          let contentText = '';
+          if (typeof content.content === 'string') {
+            contentText = content.content;
+          } else if (content.content && typeof content.content === 'object') {
+            // Handle different content structures based on content type
+            if (content.content.body) contentText += ' ' + content.content.body;
+            if (content.content.text) contentText += ' ' + content.content.text;
+            if (content.content.description) contentText += ' ' + content.content.description;
+          }
+          
+          // Combine all searchable text
+          const searchableText = [
+            content.title || '',
+            contentText,
+            content.meta_description || '',
+            (content.keywords || []).join(' '),
+            (content.categories || []).join(' '),
+            (content.tags || []).join(' ')
+          ].join(' ');
+          
+          // Use PostgreSQL to update the search vector
+          if (options.transaction) {
+            await options.transaction.sequelize.query(
+              `UPDATE contents SET search_vector = to_tsvector('english', $1) WHERE "contentId" = $2`,
+              { 
+                bind: [searchableText, content.contentId],
+                transaction: options.transaction
+              }
+            );
+          } else {
+            // If we're not in a transaction, we'll rely on afterSave hook
+            content.searchableText = searchableText;
+          }
+        }
+      },
+      afterSave: async (content, options) => {
+        // Update search vector if not done in transaction
+        if (content.searchableText && !options.transaction) {
+          await content.sequelize.query(
+            `UPDATE contents SET search_vector = to_tsvector('english', $1) WHERE "contentId" = $2`,
+            { 
+              bind: [content.searchableText, content.contentId] 
+            }
+          );
+          delete content.searchableText;
         }
       }
     },
@@ -130,6 +187,31 @@ class Content extends BaseModel {
       },
       {
         fields: ['authorId']
+      },
+      {
+        fields: ['slug']
+      },
+      {
+        fields: ['publishedAt']
+      },
+      {
+        name: 'contents_search_vector_idx',
+        using: 'GIN',
+        fields: ['search_vector']
+      },
+      {
+        name: 'contents_type_status_idx',
+        fields: ['type', 'status']
+      },
+      {
+        name: 'contents_tags_idx',
+        using: 'GIN',
+        fields: ['tags']
+      },
+      {
+        name: 'contents_categories_idx',
+        using: 'GIN',
+        fields: ['categories']
       }
     ]
   };

@@ -68,6 +68,25 @@ router.get('/system/agents/:agentId/recovery-history', adminMiddleware, systemCo
 router.post('/system/agents/:agentId/restart', adminMiddleware, systemController.restartAgent);
 router.post('/system/agents/register', adminMiddleware, systemController.registerAgent);
 
+// Database monitoring routes - require admin permission
+router.get('/system/database/health', adminMiddleware, systemController.getDatabaseHealth);
+
+// Prometheus metrics endpoint - public for monitoring systems but internal only
+router.get('/metrics', 
+  [...baseSecurityMiddleware, (req, res, next) => {
+    // Only allow requests from localhost or internal networks
+    const ip = req.ip.replace(/^::ffff:/, '');
+    if (ip === '127.0.0.1' || ip === 'localhost' || ip.startsWith('10.') || ip.startsWith('172.16.') || ip.startsWith('192.168.')) {
+      next();
+    } else {
+      res.status(403).json({
+        status: 'error',
+        message: 'Access denied'
+      });
+    }
+  }], 
+  systemController.getPrometheusMetrics);
+
 // Dead letter queue management - require admin permission
 router.get('/system/dead-letter-queue', adminMiddleware, systemController.getDeadLetterQueue);
 router.post('/system/dead-letter-queue/:key/retry', adminMiddleware, systemController.retryDeadLetterQueueEntry);

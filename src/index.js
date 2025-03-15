@@ -88,6 +88,11 @@ async function initialize() {
     await services.database.connect();
     logger.info('Connected to PostgreSQL and database service initialized');
     
+    // Initialize health monitoring service
+    const { getInstance: getHealthMonitoringService } = require('./core/monitoring/healthMonitoringService');
+    services.healthMonitoring = await getHealthMonitoringService(services.database.sequelize);
+    logger.info('Health monitoring service initialized');
+    
     // Initialize storage service
     services.storage = new StorageService(services.database.models);
     logger.info('Storage service initialized');
@@ -334,6 +339,16 @@ function setupGracefulShutdown() {
         logger.info('Shared data store connection closed');
       } catch (error) {
         logger.error('Error closing shared data store connection:', error);
+      }
+    }
+    
+    // Close health monitoring service
+    if (services.healthMonitoring) {
+      try {
+        await services.healthMonitoring.close();
+        logger.info('Health monitoring service stopped');
+      } catch (error) {
+        logger.error('Error stopping health monitoring service:', error);
       }
     }
     

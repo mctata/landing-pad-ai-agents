@@ -47,13 +47,15 @@ class Workflow extends BaseModel {
         key: 'briefId'
       }
     },
+    // Keep steps for backward compatibility, will be deprecated
+    // Use WorkflowStep model for new code
     steps: {
       type: DataTypes.JSONB,
       defaultValue: []
     },
-    currentStep: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0
+    currentStepId: {
+      type: DataTypes.STRING,
+      allowNull: true
     },
     startedAt: {
       type: DataTypes.DATE,
@@ -133,6 +135,7 @@ class Workflow extends BaseModel {
   static associate(models) {
     Workflow.belongsTo(models.Content, { foreignKey: 'contentId', targetKey: 'contentId' });
     Workflow.belongsTo(models.Brief, { foreignKey: 'briefId', targetKey: 'briefId' });
+    Workflow.hasMany(models.WorkflowStep, { foreignKey: 'workflowId', sourceKey: 'workflowId', as: 'workflowSteps' });
   }
 }
 

@@ -61,11 +61,21 @@ exports.getSystemStatus = async (req, res, next) => {
     
     // Get database status
     let dbStatus = 'unknown';
+    let dbDetails = null;
     try {
-      const ping = await agentContainer.storage.db.command({ ping: 1 });
-      dbStatus = ping.ok === 1 ? 'connected' : 'error';
+      // Try to get detailed health from our health monitoring service
+      const healthService = await getHealthMonitoringService();
+      const dbHealth = await healthService.getDatabaseHealth();
+      
+      dbStatus = dbHealth.status;
+      dbDetails = {
+        queryLatency: dbHealth.queryLatency,
+        poolStats: dbHealth.poolStats,
+        dbSize: dbHealth.dbSize
+      };
     } catch (error) {
       dbStatus = 'disconnected';
+      logger.warn('Failed to get database health details', error);
     }
     
     // Get messaging status
@@ -104,7 +114,10 @@ exports.getSystemStatus = async (req, res, next) => {
         cpu: os.cpus().length
       },
       services: {
-        database: dbStatus,
+        database: {
+          status: dbStatus,
+          details: dbDetails
+        },
         messaging: messagingStatus
       }
     });
@@ -362,6 +375,51 @@ exports.registerAgent = async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'Failed to register agent',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get database health metrics
+ */
+exports.getDatabaseHealth = async (req, res) => {
+  try {
+    const healthService = await getHealthMonitoringService();
+    const dbHealth = await healthService.getDatabaseHealth();
+    
+    return res.json({
+      status: 'ok',
+      database: dbHealth
+    });
+  } catch (error) {
+    logger.error('Failed to get database health metrics', error);
+    
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to retrieve database health metrics',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get Prometheus metrics
+ */
+exports.getPrometheusMetrics = async (req, res) => {
+  try {
+    const healthService = await getHealthMonitoringService();
+    const metrics = await healthService.databaseMonitor.getMetrics();
+    
+    // Set content type for Prometheus
+    res.setHeader('Content-Type', 'text/plain');
+    return res.send(metrics);
+  } catch (error) {
+    logger.error('Failed to get Prometheus metrics', error);
+    
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to retrieve Prometheus metrics',
       error: error.message
     });
   }
