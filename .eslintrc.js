@@ -10,14 +10,28 @@ module.exports = {
     'plugin:security/recommended',
     'plugin:node/recommended'
   ],
+  parser: "@babel/eslint-parser",
   parserOptions: {
-    ecmaVersion: 2021,
+    ecmaVersion: 2022,
+    sourceType: "module",
+    requireConfigFile: false,
+    babelOptions: {
+      plugins: [
+        "@babel/plugin-proposal-class-properties"
+      ]
+    }
   },
   plugins: [
     'security',
     'node'
   ],
   rules: {
+    // Allow unused parameters in specific methods
+    'no-unused-vars': ['error', { 
+      'argsIgnorePattern': '^_', 
+      'varsIgnorePattern': '^_'
+    }],
+    
     // Security specific rules
     'security/detect-object-injection': 'warn',
     'security/detect-non-literal-require': 'warn',
@@ -43,7 +57,7 @@ module.exports = {
     'no-eval': 'error',
     'no-implied-eval': 'error',
     'no-unsafe-negation': 'error',
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    // This is replaced by a more general rule above
     'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'curly': ['error', 'all'],
     'eqeqeq': ['error', 'always'],

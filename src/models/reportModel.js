@@ -3,152 +3,142 @@
  * Schema for analytics reports
  */
 
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const { DataTypes } = require('sequelize');
+const BaseModel = require('./baseModel');
 
-// Schema for report sections
-const ReportSectionSchema = new Schema({
-  title: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  chartType: {
-    type: String,
-    enum: [
-      'bar', 'line', 'pie', 'table', 'heatmap', 
-      'radar', 'scatter', 'summary', 'custom'
+class Report extends BaseModel {
+  // Define model attributes
+  static attributes = {
+    reportId: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false,
+      unique: true
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    type: {
+      type: DataTypes.ENUM(
+        'content_performance',
+        'audience_insights',
+        'channel_performance',
+        'seo_performance',
+        'conversion_analysis',
+        'executive_summary',
+        'custom'
+      ),
+      allowNull: false
+    },
+    dateRange: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: {
+        start: null,
+        end: null
+      }
+    },
+    contentIds: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: []
+    },
+    sections: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    summary: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    topInsights: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: []
+    },
+    recommendations: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: []
+    },
+    sharing: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        isPublic: false,
+        accessCode: null,
+        expiration: null
+      }
+    },
+    scheduledDelivery: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        isScheduled: false,
+        frequency: null,
+        recipients: [],
+        nextDelivery: null
+      }
+    },
+    metadata: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    },
+    createdBy: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    updatedBy: {
+      type: DataTypes.STRING,
+      allowNull: true
+    }
+  };
+
+  // Model options
+  static options = {
+    tableName: 'reports',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['reportId']
+      },
+      {
+        fields: ['type']
+      },
+      {
+        fields: ['createdAt']
+      },
+      {
+        fields: [{ attribute: 'dateRange', operator: 'jsonb_path_ops' }]
+      },
+      {
+        fields: [{ attribute: 'contentIds' }]
+      },
+      {
+        fields: [{ attribute: 'scheduledDelivery', operator: 'jsonb_path_ops' }]
+      }
     ]
-  },
-  data: {
-    type: Schema.Types.Mixed,
-    required: true
-  },
-  insights: [String],
-  recommendations: [String],
-  order: {
-    type: Number,
-    default: 0
+  };
+
+  /**
+   * Generate a unique report ID
+   * @returns {string} - Unique report ID
+   */
+  static generateReportId() {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
+    const randomNum = Math.floor(Math.random() * 9000) + 1000; // 4-digit number
+    return `RPT-${currentYear}${currentMonth}-${randomNum}`;
   }
-}, { _id: false });
 
-// Main Report Schema
-const ReportSchema = new Schema({
-  reportId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  title: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  type: {
-    type: String,
-    required: true,
-    enum: [
-      'content_performance', 
-      'audience_insights', 
-      'channel_performance', 
-      'seo_performance', 
-      'conversion_analysis',
-      'executive_summary',
-      'custom'
-    ],
-    index: true
-  },
-  dateRange: {
-    start: {
-      type: Date,
-      required: true
-    },
-    end: {
-      type: Date,
-      required: true
-    }
-  },
-  contentIds: [{
-    type: String,
-    index: true
-  }],
-  sections: [ReportSectionSchema],
-  summary: {
-    type: String
-  },
-  topInsights: [String],
-  recommendations: [String],
-  sharing: {
-    isPublic: {
-      type: Boolean,
-      default: false
-    },
-    accessCode: {
-      type: String
-    },
-    expiration: {
-      type: Date
-    }
-  },
-  scheduledDelivery: {
-    isScheduled: {
-      type: Boolean,
-      default: false
-    },
-    frequency: {
-      type: String,
-      enum: ['daily', 'weekly', 'monthly', 'quarterly']
-    },
-    recipients: [String],
-    nextDelivery: {
-      type: Date
-    }
-  },
-  metadata: {
-    type: Map,
-    of: Schema.Types.Mixed,
-    default: {}
-  },
-  createdBy: {
-    type: String,
-    required: true
-  },
-  updatedBy: {
-    type: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  /**
+   * Define associations with other models
+   * @param {Object} _models - All registered models
+   */
+  static associate(_models) {
+    // Can create a many-to-many association with Content through a junction table
+    // or use the ARRAY of contentIds for simplicity
   }
-}, {
-  timestamps: true
-});
-
-// Compound indexes
-ReportSchema.index({ type: 1, 'dateRange.start': 1, 'dateRange.end': 1 });
-ReportSchema.index({ 'scheduledDelivery.isScheduled': 1, 'scheduledDelivery.nextDelivery': 1 });
-
-/**
- * Generate reportId
- * Static method to generate a unique reportId
- */
-ReportSchema.statics.generateReportId = function() {
-  const currentYear = new Date().getFullYear();
-  const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
-  const randomNum = Math.floor(Math.random() * 9000) + 1000; // 4-digit number
-  return `RPT-${currentYear}${currentMonth}-${randomNum}`;
-};
-
-const Report = mongoose.model('Report', ReportSchema);
+}
 
 module.exports = Report;

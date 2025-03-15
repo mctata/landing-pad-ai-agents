@@ -3,162 +3,137 @@
  * Schema for content workflows
  */
 
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const { DataTypes } = require('sequelize');
+const BaseModel = require('./baseModel');
 
-// Schema for workflow step
-const WorkflowStepSchema = new Schema({
-  stepId: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  agent: {
-    type: String,
-    required: true
-  },
-  module: {
-    type: String
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'in_progress', 'completed', 'failed', 'skipped'],
-    default: 'pending'
-  },
-  startedAt: {
-    type: Date
-  },
-  completedAt: {
-    type: Date
-  },
-  duration: {
-    type: Number
-  },
-  result: {
-    type: Schema.Types.Mixed
-  },
-  error: {
-    type: String
-  },
-  retryCount: {
-    type: Number,
-    default: 0
-  },
-  dependencies: {
-    type: [String],
-    default: []
-  },
-  order: {
-    type: Number,
-    required: true
+class Workflow extends BaseModel {
+  // Define model attributes
+  static attributes = {
+    workflowId: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false,
+      unique: true
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    type: {
+      type: DataTypes.ENUM('content_creation', 'content_optimization', 'brand_check', 'publication', 'reporting'),
+      allowNull: false
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'failed', 'cancelled'),
+      defaultValue: 'pending'
+    },
+    contentId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'contents',
+        key: 'contentId'
+      }
+    },
+    briefId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'briefs',
+        key: 'briefId'
+      }
+    },
+    steps: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    currentStep: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
+    startedAt: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    completedAt: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    duration: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    createdBy: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    updatedBy: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    priority: {
+      type: DataTypes.INTEGER,
+      defaultValue: 5,
+      validate: {
+        min: 1,
+        max: 10
+      }
+    },
+    metadata: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    }
+  };
+
+  // Model options
+  static options = {
+    tableName: 'workflows',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['workflowId']
+      },
+      {
+        fields: ['type']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['contentId']
+      },
+      {
+        fields: ['briefId']
+      },
+      {
+        fields: ['createdAt']
+      },
+      {
+        fields: ['contentId', 'type']
+      }
+    ]
+  };
+
+  /**
+   * Generate a unique workflow ID
+   * @returns {string} - Unique workflow ID
+   */
+  static generateWorkflowId() {
+    return this.generateUniqueId('WF');
   }
-}, { _id: false });
 
-// Main Workflow Schema
-const WorkflowSchema = new Schema({
-  workflowId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  type: {
-    type: String,
-    required: true,
-    enum: [
-      'content_creation', 
-      'content_optimization', 
-      'brand_check', 
-      'publication', 
-      'reporting'
-    ],
-    index: true
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled'],
-    default: 'pending',
-    index: true
-  },
-  contentId: {
-    type: String,
-    index: true
-  },
-  briefId: {
-    type: String,
-    index: true
-  },
-  steps: [WorkflowStepSchema],
-  currentStep: {
-    type: Number,
-    default: 0
-  },
-  startedAt: {
-    type: Date
-  },
-  completedAt: {
-    type: Date
-  },
-  duration: {
-    type: Number
-  },
-  createdBy: {
-    type: String,
-    required: true
-  },
-  updatedBy: {
-    type: String
-  },
-  priority: {
-    type: Number,
-    min: 1,
-    max: 10,
-    default: 5
-  },
-  metadata: {
-    type: Map,
-    of: Schema.Types.Mixed,
-    default: {}
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  /**
+   * Define associations with other models
+   * @param {Object} models - All registered models
+   */
+  static associate(models) {
+    Workflow.belongsTo(models.Content, { foreignKey: 'contentId', targetKey: 'contentId' });
+    Workflow.belongsTo(models.Brief, { foreignKey: 'briefId', targetKey: 'briefId' });
   }
-}, {
-  timestamps: true
-});
-
-// Compound index for content and workflow type
-WorkflowSchema.index({ contentId: 1, type: 1 });
-
-/**
- * Generate workflowId
- * Static method to generate a unique workflowId
- */
-WorkflowSchema.statics.generateWorkflowId = function() {
-  const timestamp = new Date().getTime().toString(36);
-  const randomChars = Math.random().toString(36).substring(2, 5);
-  return `WF-${timestamp}${randomChars}`.toUpperCase();
-};
-
-const Workflow = mongoose.model('Workflow', WorkflowSchema);
+}
 
 module.exports = Workflow;

@@ -3,223 +3,170 @@
  * Schema for content briefs
  */
 
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const { DataTypes } = require('sequelize');
+const BaseModel = require('./baseModel');
 
-// Schema for target keywords
-const TargetKeywordSchema = new Schema({
-  keyword: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  priority: {
-    type: String,
-    enum: ['Primary', 'Secondary', 'Tertiary'],
-    default: 'Secondary'
-  },
-  searchVolume: {
-    type: Number,
-    min: 0
-  },
-  difficulty: {
-    type: Number,
-    min: 0,
-    max: 100
+class Brief extends BaseModel {
+  // Define model attributes
+  static attributes = {
+    briefId: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false,
+      unique: true
+    },
+    contentType: {
+      type: DataTypes.ENUM('BlogPost', 'SocialPost', 'WebsiteCopy', 'Email', 'LandingPage'),
+      allowNull: false
+    },
+    status: {
+      type: DataTypes.ENUM('Draft', 'Assigned', 'InProgress', 'Completed', 'Cancelled'),
+      allowNull: false,
+      defaultValue: 'Draft'
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    // Using JSONB for nested structures
+    targetKeywords: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    targetAudience: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        primary: '',
+        secondary: '',
+        excludes: '',
+        demographics: {},
+        painPoints: []
+      }
+    },
+    contentGoals: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        primary: '',
+        secondary: [],
+        kpis: []
+      }
+    },
+    outline: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    tone: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    format: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        length: {
+          min: null,
+          max: null,
+          target: null
+        },
+        structure: '',
+        formatting: '',
+        images: ''
+      }
+    },
+    callToAction: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        primary: '',
+        secondary: '',
+        url: {
+          primary: '',
+          secondary: ''
+        }
+      }
+    },
+    deadline: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        draft: null,
+        publication: null
+      }
+    },
+    assignedTo: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    additionalNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    references: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    createdBy: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    version: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      validate: {
+        min: 1
+      }
+    },
+    resultingContentId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'contents',
+        key: 'contentId'
+      }
+    }
+  };
+
+  // Model options
+  static options = {
+    tableName: 'briefs',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['briefId']
+      },
+      {
+        fields: ['contentType']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['createdAt']
+      },
+      {
+        fields: ['resultingContentId']
+      },
+      {
+        fields: ['assignedTo']
+      }
+    ]
+  };
+
+  /**
+   * Generate a unique brief ID
+   * @returns {string} - Unique brief ID
+   */
+  static generateBriefId() {
+    const currentYear = new Date().getFullYear();
+    const randomNum = Math.floor(Math.random() * 900) + 100; // 3-digit number
+    return `BRIEF-${currentYear}-${randomNum}`;
   }
-}, { _id: false });
 
-// Schema for target audience
-const TargetAudienceSchema = new Schema({
-  primary: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  secondary: {
-    type: String,
-    trim: true
-  },
-  excludes: {
-    type: String,
-    trim: true
-  },
-  demographics: {
-    type: Map,
-    of: String
-  },
-  painPoints: [String]
-}, { _id: false });
-
-// Schema for content goals
-const ContentGoalsSchema = new Schema({
-  primary: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  secondary: [String],
-  kpis: [String]
-}, { _id: false });
-
-// Schema for outline sections
-const OutlineSectionSchema = new Schema({
-  section: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  keyPoints: [String]
-}, { _id: false });
-
-// Schema for format
-const FormatSchema = new Schema({
-  length: {
-    min: Number,
-    max: Number,
-    target: Number
-  },
-  structure: String,
-  formatting: String,
-  images: String
-}, { _id: false });
-
-// Schema for call to action
-const CallToActionSchema = new Schema({
-  primary: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  secondary: {
-    type: String,
-    trim: true
-  },
-  url: {
-    primary: String,
-    secondary: String
+  /**
+   * Define associations with other models
+   * @param {Object} models - All registered models
+   */
+  static associate(models) {
+    Brief.belongsTo(models.Content, { foreignKey: 'resultingContentId', targetKey: 'contentId', as: 'resultingContent' });
+    // Add other associations as needed
   }
-}, { _id: false });
-
-// Schema for deadlines
-const DeadlineSchema = new Schema({
-  draft: {
-    type: Date,
-    required: true
-  },
-  publication: {
-    type: Date
-  }
-}, { _id: false });
-
-// Schema for references
-const ReferenceSchema = new Schema({
-  type: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  url: {
-    type: String,
-    trim: true
-  }
-}, { _id: false });
-
-// Main Brief Schema
-const BriefSchema = new Schema({
-  briefId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  contentType: {
-    type: String,
-    required: true,
-    enum: ['BlogPost', 'SocialPost', 'WebsiteCopy', 'Email', 'LandingPage'],
-    index: true
-  },
-  status: {
-    type: String,
-    required: true,
-    enum: ['Draft', 'Assigned', 'InProgress', 'Completed', 'Cancelled'],
-    default: 'Draft',
-    index: true
-  },
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  targetKeywords: [TargetKeywordSchema],
-  targetAudience: TargetAudienceSchema,
-  contentGoals: ContentGoalsSchema,
-  outline: [OutlineSectionSchema],
-  tone: {
-    type: String,
-    trim: true
-  },
-  format: FormatSchema,
-  callToAction: CallToActionSchema,
-  deadline: DeadlineSchema,
-  assignedTo: {
-    type: String,
-    trim: true
-  },
-  additionalNotes: {
-    type: String,
-    trim: true
-  },
-  references: [ReferenceSchema],
-  createdBy: {
-    type: String,
-    required: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  version: {
-    type: Number,
-    default: 1,
-    min: 1
-  },
-  resultingContentId: {
-    type: String,
-    index: true
-  }
-}, {
-  timestamps: true
-});
-
-// Text index for search
-BriefSchema.index({ 
-  title: 'text', 
-  'targetKeywords.keyword': 'text',
-  'targetAudience.primary': 'text',
-  additionalNotes: 'text'
-});
-
-/**
- * Generate briefId
- * Static method to generate a unique briefId
- */
-BriefSchema.statics.generateBriefId = function() {
-  const currentYear = new Date().getFullYear();
-  const randomNum = Math.floor(Math.random() * 900) + 100; // 3-digit number
-  return `BRIEF-${currentYear}-${randomNum}`;
-};
-
-const Brief = mongoose.model('Brief', BriefSchema);
+}
 
 module.exports = Brief;

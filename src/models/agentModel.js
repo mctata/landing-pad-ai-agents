@@ -3,167 +3,151 @@
  * Schema for AI agents
  */
 
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const { DataTypes } = require('sequelize');
+const BaseModel = require('./baseModel');
 
-// Schema for module configuration
-const ModuleConfigSchema = new Schema({
-  name: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  enabled: {
-    type: Boolean,
-    default: true
-  },
-  config: {
-    type: Map,
-    of: Schema.Types.Mixed,
-    default: {}
-  },
-  lastError: {
-    type: String
-  },
-  lastErrorTimestamp: {
-    type: Date
-  }
-}, { _id: false });
-
-// Main Agent Schema
-const AgentSchema = new Schema({
-  agentId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String
-  },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'error', 'maintenance'],
-    default: 'active',
-    index: true
-  },
-  type: {
-    type: String,
-    required: true,
-    enum: [
-      'content_strategy', 
-      'content_creation', 
-      'content_management', 
-      'optimisation', 
-      'brand_consistency'
-    ],
-    index: true
-  },
-  modules: [ModuleConfigSchema],
-  config: {
-    type: Map,
-    of: Schema.Types.Mixed,
-    default: {}
-  },
-  lastActivity: {
-    type: Date
-  },
-  lastError: {
-    type: String
-  },
-  lastErrorTimestamp: {
-    type: Date
-  },
-  performance: {
-    requestsProcessed: {
-      type: Number,
-      default: 0
+class Agent extends BaseModel {
+  // Define model attributes
+  static attributes = {
+    agentId: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false,
+      unique: true
     },
-    successfulRequests: {
-      type: Number,
-      default: 0
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false
     },
-    failedRequests: {
-      type: Number,
-      default: 0
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
-    averageResponseTime: {
-      type: Number,
-      default: 0
+    status: {
+      type: DataTypes.ENUM('active', 'inactive', 'error', 'maintenance'),
+      defaultValue: 'active'
+    },
+    type: {
+      type: DataTypes.ENUM('content_strategy', 'content_creation', 'content_management', 'optimisation', 'brand_consistency'),
+      allowNull: false
+    },
+    modules: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    config: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    },
+    lastActivity: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    lastError: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    lastErrorTimestamp: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    performance: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        requestsProcessed: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        averageResponseTime: 0
+      }
+    },
+    createdBy: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    updatedBy: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
-  },
-  createdBy: {
-    type: String,
-    required: true
-  },
-  updatedBy: {
-    type: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  };
+
+  // Model options
+  static options = {
+    tableName: 'agents',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['agentId']
+      },
+      {
+        fields: ['type']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['lastActivity']
+      }
+    ]
+  };
+
+  /**
+   * Update agent activity
+   * Method to update the last activity timestamp
+   */
+  updateActivity() {
+    this.lastActivity = new Date();
+    return this.save();
   }
-}, {
-  timestamps: true
-});
 
-/**
- * Update agent activity
- * Method to update the last activity timestamp
- */
-AgentSchema.methods.updateActivity = function() {
-  this.lastActivity = new Date();
-  return this.save();
-};
-
-/**
- * Record request
- * Method to record a request and update performance metrics
- */
-AgentSchema.methods.recordRequest = function(successful, responseTime) {
-  this.performance.requestsProcessed += 1;
-  
-  if (successful) {
-    this.performance.successfulRequests += 1;
-  } else {
-    this.performance.failedRequests += 1;
+  /**
+   * Record request
+   * Method to record a request and update performance metrics
+   * @param {boolean} successful - Whether the request was successful
+   * @param {number} responseTime - Response time in milliseconds
+   */
+  recordRequest(successful, responseTime) {
+    const performance = { ...this.performance };
+    
+    performance.requestsProcessed += 1;
+    
+    if (successful) {
+      performance.successfulRequests += 1;
+    } else {
+      performance.failedRequests += 1;
+    }
+    
+    // Update average response time with a weighted approach
+    const totalRequests = performance.requestsProcessed;
+    const currentAverage = performance.averageResponseTime || 0;
+    
+    if (totalRequests <= 1) {
+      performance.averageResponseTime = responseTime;
+    } else {
+      performance.averageResponseTime = 
+        ((currentAverage * (totalRequests - 1)) + responseTime) / totalRequests;
+    }
+    
+    this.performance = performance;
+    return this.save();
   }
-  
-  // Update average response time with a weighted approach
-  const totalRequests = this.performance.requestsProcessed;
-  const currentAverage = this.performance.averageResponseTime || 0;
-  
-  if (totalRequests <= 1) {
-    this.performance.averageResponseTime = responseTime;
-  } else {
-    this.performance.averageResponseTime = 
-      ((currentAverage * (totalRequests - 1)) + responseTime) / totalRequests;
+
+  /**
+   * Generate a unique agent ID
+   * @param {string} type - Agent type
+   * @returns {string} - Unique agent ID
+   */
+  static generateAgentId(type) {
+    const agentTypePrefix = type ? type.substring(0, 3).toUpperCase() : 'AGT';
+    return this.generateUniqueId(agentTypePrefix);
   }
-  
-  return this.save();
-};
 
-/**
- * Generate agentId
- * Static method to generate a unique agentId
- */
-AgentSchema.statics.generateAgentId = function(type) {
-  const agentTypePrefix = type ? type.substring(0, 3).toUpperCase() : 'AGT';
-  const timestamp = new Date().getTime().toString(36);
-  const randomChars = Math.random().toString(36).substring(2, 4);
-  return `${agentTypePrefix}-${timestamp}${randomChars}`.toUpperCase();
-};
-
-const Agent = mongoose.model('Agent', AgentSchema);
+  /**
+   * Define associations with other models
+   * @param {Object} _models - All registered models
+   */
+  static associate(_models) {
+    // Define associations if needed
+  }
+}
 
 module.exports = Agent;

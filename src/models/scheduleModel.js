@@ -3,127 +3,139 @@
  * Schema for content publication schedules
  */
 
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const { DataTypes } = require('sequelize');
+const BaseModel = require('./baseModel');
 
-// Schema for publication platform details
-const PlatformDetailsSchema = new Schema({
-  platformId: {
-    type: String,
-    required: true
-  },
-  platformName: {
-    type: String,
-    required: true
-  },
-  account: {
-    type: String
-  },
-  targetUrl: {
-    type: String
-  },
-  customSettings: {
-    type: Map,
-    of: Schema.Types.Mixed,
-    default: {}
+class Schedule extends BaseModel {
+  // Define model attributes
+  static attributes = {
+    scheduleId: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false,
+      unique: true
+    },
+    contentId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      references: {
+        model: 'contents',
+        key: 'contentId'
+      }
+    },
+    contentType: {
+      type: DataTypes.ENUM('blog', 'social', 'website', 'email', 'landing_page'),
+      allowNull: false
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    scheduledDate: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+    publishDate: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    status: {
+      type: DataTypes.ENUM('scheduled', 'published', 'failed', 'cancelled', 'draft'),
+      defaultValue: 'scheduled'
+    },
+    platforms: {
+      type: DataTypes.JSONB,
+      defaultValue: []
+    },
+    recurrence: {
+      type: DataTypes.ENUM('none', 'daily', 'weekly', 'monthly'),
+      defaultValue: 'none'
+    },
+    recurrenceEndDate: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    publishedUrl: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    publishError: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    workflowId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'workflows',
+        key: 'workflowId'
+      }
+    },
+    metadata: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    },
+    createdBy: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    updatedBy: {
+      type: DataTypes.STRING,
+      allowNull: true
+    }
+  };
+
+  // Model options
+  static options = {
+    tableName: 'schedules',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['scheduleId']
+      },
+      {
+        fields: ['contentId']
+      },
+      {
+        fields: ['contentType']
+      },
+      {
+        fields: ['scheduledDate']
+      },
+      {
+        fields: ['publishDate']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['workflowId']
+      },
+      {
+        fields: ['scheduledDate', 'status']
+      },
+      {
+        fields: [{ attribute: 'platforms', operator: 'jsonb_path_ops' }]
+      }
+    ]
+  };
+
+  /**
+   * Generate a unique schedule ID
+   * @returns {string} - Unique schedule ID
+   */
+  static generateScheduleId() {
+    return this.generateUniqueId('SCH');
   }
-}, { _id: false });
 
-// Main Schedule Schema
-const ScheduleSchema = new Schema({
-  scheduleId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  contentId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  contentType: {
-    type: String,
-    required: true,
-    enum: ['blog', 'social', 'website', 'email', 'landing_page'],
-    index: true
-  },
-  title: {
-    type: String,
-    required: true
-  },
-  scheduledDate: {
-    type: Date,
-    required: true,
-    index: true
-  },
-  publishDate: {
-    type: Date,
-    index: true
-  },
-  status: {
-    type: String,
-    enum: ['scheduled', 'published', 'failed', 'cancelled', 'draft'],
-    default: 'scheduled',
-    index: true
-  },
-  platforms: [PlatformDetailsSchema],
-  recurrence: {
-    type: String,
-    enum: ['none', 'daily', 'weekly', 'monthly'],
-    default: 'none'
-  },
-  recurrenceEndDate: {
-    type: Date
-  },
-  publishedUrl: {
-    type: String
-  },
-  publishError: {
-    type: String
-  },
-  workflowId: {
-    type: String,
-    index: true
-  },
-  metadata: {
-    type: Map,
-    of: Schema.Types.Mixed,
-    default: {}
-  },
-  createdBy: {
-    type: String,
-    required: true
-  },
-  updatedBy: {
-    type: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  /**
+   * Define associations with other models
+   * @param {Object} models - All registered models
+   */
+  static associate(models) {
+    Schedule.belongsTo(models.Content, { foreignKey: 'contentId', targetKey: 'contentId' });
+    Schedule.belongsTo(models.Workflow, { foreignKey: 'workflowId', targetKey: 'workflowId' });
   }
-}, {
-  timestamps: true
-});
-
-// Compound indexes
-ScheduleSchema.index({ scheduledDate: 1, status: 1 });
-ScheduleSchema.index({ contentId: 1, 'platforms.platformId': 1 });
-
-/**
- * Generate scheduleId
- * Static method to generate a unique scheduleId
- */
-ScheduleSchema.statics.generateScheduleId = function() {
-  const timestamp = new Date().getTime().toString(36);
-  const randomChars = Math.random().toString(36).substring(2, 5);
-  return `SCH-${timestamp}${randomChars}`.toUpperCase();
-};
-
-const Schedule = mongoose.model('Schedule', ScheduleSchema);
+}
 
 module.exports = Schedule;
