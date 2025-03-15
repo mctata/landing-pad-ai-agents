@@ -52,12 +52,12 @@ For deployment, ensure the following environment variables are set in GitHub Sec
 - `JWT_SECRET` - Secret for JWT authentication
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` - API keys for AI providers
 
-### AWS Deployment Variables
+### S3 Storage Variables
 
-- `AWS_ACCESS_KEY_ID` - AWS access key for deployment
-- `AWS_SECRET_ACCESS_KEY` - AWS secret key for deployment
-- `AWS_REGION` - AWS region for deployment
-- `AWS_S3_BUCKET` - S3 bucket for assets and deployment artifacts
+- `S3_ACCESS_KEY_ID` - S3 access key for storage
+- `S3_SECRET_ACCESS_KEY` - S3 secret key for storage
+- `S3_REGION` - S3 region for storage
+- `S3_BUCKET` - S3 bucket for assets and deployment artifacts
 
 ### Optional Variables
 
