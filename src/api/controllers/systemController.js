@@ -424,3 +424,165 @@ exports.getPrometheusMetrics = async (req, res) => {
     });
   }
 };
+
+/**
+ * Change a user's password
+ */
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const User = require('../../models/userModel');
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: {
+          message: 'Current password and new password are required',
+          code: 'missing_password'
+        }
+      });
+    }
+    
+    // Get user from database
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        error: {
+          message: 'User not found',
+          code: 'user_not_found'
+        }
+      });
+    }
+    
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        error: {
+          message: 'Current password is incorrect',
+          code: 'incorrect_password'
+        }
+      });
+    }
+    
+    // Set new password
+    user.password = newPassword;
+    user.requiresPasswordChange = false;
+    await user.save();
+    
+    return res.json({
+      status: 'ok',
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to change password', error);
+    
+    return res.status(500).json({
+      error: {
+        message: 'Failed to change password',
+        code: 'password_change_failed'
+      }
+    });
+  }
+};
+
+/**
+ * Request a password reset
+ */
+exports.requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const User = require('../../models/userModel');
+    
+    if (!email) {
+      return res.status(400).json({
+        error: {
+          message: 'Email is required',
+          code: 'missing_email'
+        }
+      });
+    }
+    
+    // Find user by email
+    const user = await User.findOne({ email });
+    
+    // Don't reveal whether a user exists or not for security reasons
+    // Always return success even if no user is found
+    if (user) {
+      // Generate reset token
+      const resetToken = await user.generatePasswordResetToken();
+      
+      // In a real application, send an email with the reset link
+      // For now, just log it
+      logger.info(`Password reset token for ${email}: ${resetToken}`);
+    }
+    
+    return res.json({
+      status: 'ok',
+      message: 'If the email exists, a password reset link has been sent'
+    });
+  } catch (error) {
+    logger.error('Failed to request password reset', error);
+    
+    return res.status(500).json({
+      error: {
+        message: 'Failed to request password reset',
+        code: 'password_reset_request_failed'
+      }
+    });
+  }
+};
+
+/**
+ * Reset a password using a reset token
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const User = require('../../models/userModel');
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        error: {
+          message: 'Token and new password are required',
+          code: 'missing_parameters'
+        }
+      });
+    }
+    
+    // Find user by reset token
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+    
+    if (!user) {
+      return res.status(400).json({
+        error: {
+          message: 'Password reset token is invalid or has expired',
+          code: 'invalid_token'
+        }
+      });
+    }
+    
+    // Set new password
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    user.requiresPasswordChange = false;
+    await user.save();
+    
+    return res.json({
+      status: 'ok',
+      message: 'Password has been reset successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to reset password', error);
+    
+    return res.status(500).json({
+      error: {
+        message: 'Failed to reset password',
+        code: 'password_reset_failed'
+      }
+    });
+  }
+};

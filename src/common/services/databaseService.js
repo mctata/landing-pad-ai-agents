@@ -10,7 +10,8 @@ const logger = require('./logger');
 class DatabaseService {
   constructor(config) {
     this.config = config;
-    this.logger = logger.createLogger('database');
+    // Use logger directly since it's already a winston instance
+    this.logger = logger;
     this.models = models;
     this.isConnected = false;
     this.sequelize = null;

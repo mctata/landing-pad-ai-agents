@@ -4,7 +4,7 @@
  */
 
 const { Sequelize } = require('sequelize');
-const logger = require('../../common/services/logger').createLogger('database-monitor');
+const logger = require('../../common/services/logger');
 const { register, Gauge, Counter, Histogram } = require('prom-client');
 
 // Initialize metrics

@@ -6,10 +6,9 @@
 const BaseAgent = require('../../common/models/base-agent');
 
 class ContentStrategyAgent extends BaseAgent {
-  constructor(config, messaging, storage, logger, aiProvider) {
-    super(config, messaging, storage, logger);
-    this.aiProvider = aiProvider;
-    this.name = 'content_strategy';
+  constructor(config) {
+    // Pass name along with config to super
+    super({...config, name: 'contentStrategy'});
   }
   
   async initialize() {

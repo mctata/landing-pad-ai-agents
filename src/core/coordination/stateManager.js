@@ -1,35 +1,88 @@
 // src/core/coordination/stateManager.js
-const { MongoClient } = require('mongodb');
+// PostgreSQL implementation
+const { Sequelize, DataTypes, Op } = require('sequelize');
 const config = require('../../config');
 const logger = require('../utils/logger');
 
 class StateManager {
   constructor() {
-    this.client = null;
-    this.db = null;
-    this.collection = null;
+    this.sequelize = null;
+    this.WorkflowState = null;
     this.isConnected = false;
   }
 
   async connect() {
     try {
-      this.client = new MongoClient(config.database.url, config.database.options);
-      await this.client.connect();
-      
-      this.db = this.client.db(config.database.name);
-      this.collection = this.db.collection('workflow_states');
+      // Initialize Sequelize with the same database configuration
+      // This assumes the sequelize is already configured in the app
+      const dbConfig = config.database.postgres;
+      this.sequelize = new Sequelize(
+        dbConfig.database,
+        dbConfig.username,
+        dbConfig.password,
+        {
+          host: dbConfig.host,
+          port: dbConfig.port,
+          dialect: 'postgres',
+          logging: false,
+        }
+      );
+
+      // Define the WorkflowState model
+      this.WorkflowState = this.sequelize.define('workflow_state', {
+        id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        },
+        workflowId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true
+        },
+        _state: {
+          type: DataTypes.STRING,
+          allowNull: false
+        },
+        _created: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        },
+        _lastUpdated: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        },
+        _history: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: []
+        },
+        data: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: {}
+        }
+      });
+
+      // Sync model to ensure table exists
+      await this.WorkflowState.sync();
       
       // Create indexes for efficient lookups
-      await this.collection.createIndex({ workflowId: 1 }, { unique: true });
-      await this.collection.createIndex({ '_state': 1 });
-      await this.collection.createIndex({ '_lastUpdated': 1 });
+      await this.sequelize.query(
+        'CREATE INDEX IF NOT EXISTS idx_workflow_state_state ON workflow_states (_state)'
+      );
+      await this.sequelize.query(
+        'CREATE INDEX IF NOT EXISTS idx_workflow_state_lastUpdated ON workflow_states (_lastUpdated)'
+      );
       
       this.isConnected = true;
-      logger.info('StateManager connected to MongoDB');
+      logger.info('StateManager connected to PostgreSQL');
       
       return this;
     } catch (error) {
-      logger.error('Failed to connect StateManager to MongoDB', error);
+      logger.error('Failed to connect StateManager to PostgreSQL', error);
       throw error;
     }
   }
@@ -40,24 +93,24 @@ class StateManager {
     }
     
     try {
-      const document = {
+      const historyEntry = {
+        state,
+        timestamp: new Date(),
+        data: JSON.parse(JSON.stringify(data)) // Deep clone to avoid reference issues
+      };
+      
+      const result = await this.WorkflowState.create({
         workflowId,
         _state: state,
         _created: new Date(),
         _lastUpdated: new Date(),
-        _history: [{
-          state,
-          timestamp: new Date(),
-          data: JSON.parse(JSON.stringify(data)) // Deep clone to avoid reference issues
-        }],
-        ...data
-      };
-      
-      const result = await this.collection.insertOne(document);
+        _history: [historyEntry],
+        data: data
+      });
       
       logger.debug(`Saved initial state for workflow ${workflowId}: ${state}`);
       
-      return result.insertedId;
+      return result.id;
     } catch (error) {
       logger.error(`Failed to save workflow state for ${workflowId}`, error);
       throw error;
@@ -71,50 +124,48 @@ class StateManager {
     
     try {
       // Get current workflow state document
-      const currentDoc = await this.collection.findOne({ workflowId });
+      const currentState = await this.WorkflowState.findOne({
+        where: { workflowId }
+      });
       
-      if (!currentDoc) {
+      if (!currentState) {
         throw new Error(`Workflow ${workflowId} not found`);
       }
       
       // Determine the state to record
-      const stateToRecord = newState || currentDoc._state;
+      const stateToRecord = newState || currentState._state;
       
-      // Create update operation
-      const update = {
-        $set: {
-          _lastUpdated: new Date(),
-          ...data
-        }
+      // Create history entry
+      const historyEntry = {
+        state: stateToRecord,
+        timestamp: new Date(),
+        data: JSON.parse(JSON.stringify(data)) // Deep clone
+      };
+      
+      // Update the workflow state
+      const updateData = {
+        _lastUpdated: new Date(),
+        data: { ...currentState.data, ...data },
+        _history: [...currentState._history, historyEntry]
       };
       
       // If state is changing, update the _state field
       if (newState) {
-        update.$set._state = newState;
+        updateData._state = newState;
       }
       
-      // Add to history
-      update.$push = {
-        _history: {
-          state: stateToRecord,
-          timestamp: new Date(),
-          data: JSON.parse(JSON.stringify(data)) // Deep clone
-        }
-      };
-      
       // Execute update
-      const result = await this.collection.updateOne(
-        { workflowId },
-        update
-      );
+      const [updated] = await this.WorkflowState.update(updateData, {
+        where: { workflowId }
+      });
       
-      if (result.modifiedCount === 0) {
+      if (updated === 0) {
         throw new Error(`Failed to update workflow ${workflowId} state`);
       }
       
       logger.debug(`Updated state for workflow ${workflowId}${newState ? ` to ${newState}` : ''}`);
       
-      return result.modifiedCount;
+      return updated;
     } catch (error) {
       logger.error(`Failed to update workflow state for ${workflowId}`, error);
       throw error;
@@ -127,13 +178,16 @@ class StateManager {
     }
     
     try {
-      const doc = await this.collection.findOne({ workflowId });
+      const state = await this.WorkflowState.findOne({
+        where: { workflowId }
+      });
       
-      if (!doc) {
+      if (!state) {
         throw new Error(`Workflow ${workflowId} not found`);
       }
       
-      return doc;
+      // Convert to plain object
+      return state.get({ plain: true });
     } catch (error) {
       logger.error(`Failed to get workflow state for ${workflowId}`, error);
       throw error;
@@ -146,16 +200,16 @@ class StateManager {
     }
     
     try {
-      const doc = await this.collection.findOne(
-        { workflowId },
-        { projection: { _history: 1 } }
-      );
+      const state = await this.WorkflowState.findOne({
+        where: { workflowId },
+        attributes: ['_history']
+      });
       
-      if (!doc) {
+      if (!state) {
         throw new Error(`Workflow ${workflowId} not found`);
       }
       
-      return doc._history || [];
+      return state._history || [];
     } catch (error) {
       logger.error(`Failed to get workflow history for ${workflowId}`, error);
       throw error;
@@ -168,7 +222,11 @@ class StateManager {
     }
     
     try {
-      const count = await this.collection.countDocuments({ workflowId }, { limit: 1 });
+      const count = await this.WorkflowState.count({
+        where: { workflowId },
+        limit: 1
+      });
+      
       return count > 0;
     } catch (error) {
       logger.error(`Failed to check if workflow ${workflowId} exists`, error);
@@ -182,17 +240,16 @@ class StateManager {
     }
     
     try {
-      const workflows = await this.collection.find(
-        { _state: state },
-        {
-          projection: { workflowId: 1, _state: 1, _created: 1, _lastUpdated: 1 },
-          limit,
-          skip,
-          sort: { _lastUpdated: -1 }
-        }
-      ).toArray();
+      const workflows = await this.WorkflowState.findAll({
+        where: { _state: state },
+        attributes: ['workflowId', '_state', '_created', '_lastUpdated'],
+        limit,
+        offset: skip,
+        order: [['_lastUpdated', 'DESC']]
+      });
       
-      return workflows;
+      // Convert to plain objects
+      return workflows.map(wf => wf.get({ plain: true }));
     } catch (error) {
       logger.error(`Failed to find workflows by state ${state}`, error);
       throw error;
@@ -208,14 +265,16 @@ class StateManager {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
       
-      const result = await this.collection.deleteMany({
-        _created: { $lt: cutoffDate },
-        _state: { $in: ['workflow-completed', 'workflow-failed'] }
+      const result = await this.WorkflowState.destroy({
+        where: {
+          _created: { [Op.lt]: cutoffDate },
+          _state: { [Op.in]: ['workflow-completed', 'workflow-failed'] }
+        }
       });
       
-      logger.info(`Cleaned up ${result.deletedCount} old workflow states`);
+      logger.info(`Cleaned up ${result} old workflow states`);
       
-      return result.deletedCount;
+      return result;
     } catch (error) {
       logger.error('Failed to clean up old workflows', error);
       throw error;
@@ -223,10 +282,10 @@ class StateManager {
   }
 
   async close() {
-    if (this.client) {
-      await this.client.close();
+    if (this.sequelize) {
+      await this.sequelize.close();
       this.isConnected = false;
-      logger.info('StateManager disconnected from MongoDB');
+      logger.info('StateManager disconnected from PostgreSQL');
     }
   }
 }

@@ -1,57 +1,206 @@
 // src/core/data/sharedDataStore.js
-const { MongoClient } = require('mongodb');
+const { Sequelize, DataTypes, Op } = require('sequelize');
 const config = require('../../config');
 const logger = require('../utils/logger');
 
 class SharedDataStore {
   constructor() {
-    this.client = null;
-    this.db = null;
-    this.collections = {
-      content: null,
-      contentVersions: null,
-      metadata: null,
-      assets: null
+    this.sequelize = null;
+    this.models = {
+      Content: null,
+      ContentVersion: null,
+      Metadata: null,
+      Asset: null
     };
     this.isConnected = false;
   }
 
   async connect() {
     try {
-      this.client = new MongoClient(config.database.url, config.database.options);
-      await this.client.connect();
-      
-      this.db = this.client.db(config.database.name);
-      
-      // Initialize collections
-      this.collections.content = this.db.collection('content');
-      this.collections.contentVersions = this.db.collection('content_versions');
-      this.collections.metadata = this.db.collection('metadata');
-      this.collections.assets = this.db.collection('assets');
-      
-      // Create indexes for efficient lookups
-      await this.collections.content.createIndex({ contentId: 1 }, { unique: true });
-      await this.collections.content.createIndex({ status: 1 });
-      await this.collections.content.createIndex({ contentType: 1 });
-      await this.collections.content.createIndex({ tags: 1 });
-      await this.collections.content.createIndex({ createdAt: 1 });
-      await this.collections.content.createIndex({ updatedAt: 1 });
-      
-      await this.collections.contentVersions.createIndex({ contentId: 1, version: 1 }, { unique: true });
-      await this.collections.contentVersions.createIndex({ createdAt: 1 });
-      
-      await this.collections.metadata.createIndex({ contentId: 1 }, { unique: true });
-      await this.collections.metadata.createIndex({ key: 1, value: 1 });
-      
-      await this.collections.assets.createIndex({ contentId: 1 });
-      await this.collections.assets.createIndex({ assetType: 1 });
+      // Initialize Sequelize with the same database configuration
+      const dbConfig = config.database.postgres;
+      this.sequelize = new Sequelize(
+        dbConfig.database,
+        dbConfig.username,
+        dbConfig.password,
+        {
+          host: dbConfig.host,
+          port: dbConfig.port,
+          dialect: 'postgres',
+          logging: false,
+        }
+      );
+
+      // Define the Content model
+      this.models.Content = this.sequelize.define('content_store', {
+        id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        },
+        contentId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true
+        },
+        version: {
+          type: DataTypes.INTEGER,
+          allowNull: false,
+          defaultValue: 1
+        },
+        status: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          defaultValue: 'draft'
+        },
+        contentType: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        tags: {
+          type: DataTypes.ARRAY(DataTypes.STRING),
+          defaultValue: []
+        },
+        title: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        description: {
+          type: DataTypes.TEXT,
+          allowNull: true
+        },
+        content: {
+          type: DataTypes.JSONB,
+          defaultValue: {}
+        },
+        createdBy: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          defaultValue: 'system'
+        },
+        updatedBy: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        createdAt: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        },
+        updatedAt: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        }
+      });
+
+      // Define the ContentVersion model
+      this.models.ContentVersion = this.sequelize.define('content_version_store', {
+        id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        },
+        contentId: {
+          type: DataTypes.STRING,
+          allowNull: false
+        },
+        version: {
+          type: DataTypes.INTEGER,
+          allowNull: false
+        },
+        data: {
+          type: DataTypes.JSONB,
+          allowNull: false
+        },
+        createdAt: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        }
+      }, {
+        indexes: [
+          {
+            unique: true,
+            fields: ['contentId', 'version']
+          }
+        ]
+      });
+
+      // Define the Metadata model
+      this.models.Metadata = this.sequelize.define('metadata_store', {
+        id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        },
+        contentId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true
+        },
+        metadata: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: {}
+        },
+        createdAt: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        },
+        updatedAt: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        }
+      });
+
+      // Define the Asset model
+      this.models.Asset = this.sequelize.define('asset_store', {
+        id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        },
+        assetId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true
+        },
+        contentId: {
+          type: DataTypes.STRING,
+          allowNull: false
+        },
+        assetType: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        url: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        data: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: {}
+        },
+        createdAt: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW
+        }
+      });
+
+      // Sync all models
+      await this.sequelize.sync();
       
       this.isConnected = true;
-      logger.info('SharedDataStore connected to MongoDB');
+      logger.info('SharedDataStore connected to PostgreSQL');
       
       return this;
     } catch (error) {
-      logger.error('Failed to connect SharedDataStore to MongoDB', error);
+      logger.error('Failed to connect SharedDataStore to PostgreSQL', error);
       throw error;
     }
   }
@@ -81,11 +230,8 @@ class SharedDataStore {
         ...contentData
       };
       
-      // Remove any specified _id to let MongoDB generate its own
-      delete contentDocument._id;
-      
       // Insert the content
-      const result = await this.collections.content.insertOne(contentDocument);
+      const result = await this.models.Content.create(contentDocument);
       
       // Create the first version
       await this.saveContentVersion(contentId, contentDocument);
@@ -136,12 +282,11 @@ class SharedDataStore {
       delete updateDoc.createdBy;
       
       // Update the content
-      const result = await this.collections.content.updateOne(
-        { contentId },
-        { $set: updateDoc }
-      );
+      const [updated] = await this.models.Content.update(updateDoc, {
+        where: { contentId }
+      });
       
-      if (result.modifiedCount === 0) {
+      if (updated === 0) {
         throw new Error(`Failed to update content ${contentId}`);
       }
       
@@ -176,16 +321,16 @@ class SharedDataStore {
       const versionDocument = {
         contentId,
         version: contentData.version,
-        data: { ...contentData },
+        data: contentData,
         createdAt: new Date()
       };
       
       // Insert the version
-      const result = await this.collections.contentVersions.insertOne(versionDocument);
+      const result = await this.models.ContentVersion.create(versionDocument);
       
       logger.debug(`Saved version ${contentData.version} for content ${contentId}`);
       
-      return result.insertedId.toString();
+      return result.id;
     } catch (error) {
       logger.error(`Failed to save version for content ${contentId}`, error);
       throw error;
@@ -203,8 +348,15 @@ class SharedDataStore {
     }
     
     try {
-      const content = await this.collections.content.findOne({ contentId });
-      return content;
+      const content = await this.models.Content.findOne({
+        where: { contentId }
+      });
+      
+      if (!content) {
+        return null;
+      }
+      
+      return content.get({ plain: true });
     } catch (error) {
       logger.error(`Failed to get content ${contentId}`, error);
       throw error;
@@ -223,19 +375,17 @@ class SharedDataStore {
     }
     
     try {
-      const query = { contentId };
-      const sort = options.sort || { version: -1 };
-      const limit = options.limit || 0;
-      const skip = options.skip || 0;
+      const limit = options.limit || 100;
+      const offset = options.skip || 0;
       
-      const versions = await this.collections.contentVersions
-        .find(query)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .toArray();
+      const versions = await this.models.ContentVersion.findAll({
+        where: { contentId },
+        order: [['version', 'DESC']],
+        limit,
+        offset
+      });
       
-      return versions;
+      return versions.map(v => v.get({ plain: true }));
     } catch (error) {
       logger.error(`Failed to get version history for content ${contentId}`, error);
       throw error;
@@ -254,7 +404,9 @@ class SharedDataStore {
     }
     
     try {
-      const versionDoc = await this.collections.contentVersions.findOne({ contentId, version });
+      const versionDoc = await this.models.ContentVersion.findOne({
+        where: { contentId, version }
+      });
       
       if (!versionDoc) {
         return null;
@@ -298,13 +450,14 @@ class SharedDataStore {
         return true;
       } else {
         // Hard delete - remove from database
-        const result = await this.collections.content.deleteOne({ contentId });
+        const deleted = await this.models.Content.destroy({
+          where: { contentId }
+        });
         
-        if (result.deletedCount === 0) {
+        if (deleted === 0) {
           throw new Error(`Content ${contentId} not found for deletion`);
         }
         
-        // Delete versions (but keep them for a time-based cleanup)
         logger.info(`Hard deleted content ${contentId}`);
         return true;
       }
@@ -326,68 +479,75 @@ class SharedDataStore {
     }
     
     try {
-      const mongoQuery = {};
+      const whereClause = {};
       
       // Build the query
       if (query.contentType) {
-        mongoQuery.contentType = query.contentType;
+        whereClause.contentType = query.contentType;
       }
       
       if (query.status) {
-        mongoQuery.status = query.status;
+        whereClause.status = query.status;
       }
       
       if (query.tags && query.tags.length > 0) {
-        mongoQuery.tags = { $all: query.tags };
+        whereClause.tags = { [Op.contains]: query.tags };
       }
       
       if (query.createdBy) {
-        mongoQuery.createdBy = query.createdBy;
+        whereClause.createdBy = query.createdBy;
       }
       
       if (query.updatedBy) {
-        mongoQuery.updatedBy = query.updatedBy;
+        whereClause.updatedBy = query.updatedBy;
       }
       
       if (query.dateRange) {
-        mongoQuery.createdAt = {};
+        whereClause.createdAt = {};
         
         if (query.dateRange.from) {
-          mongoQuery.createdAt.$gte = new Date(query.dateRange.from);
+          whereClause.createdAt[Op.gte] = new Date(query.dateRange.from);
         }
         
         if (query.dateRange.to) {
-          mongoQuery.createdAt.$lte = new Date(query.dateRange.to);
+          whereClause.createdAt[Op.lte] = new Date(query.dateRange.to);
         }
       }
       
       // Text search
       if (query.text) {
-        mongoQuery.$text = { $search: query.text };
+        // Use tsvector for full-text search in PostgreSQL if available
+        // For simplicity, we'll just search in title and description
+        whereClause[Op.or] = [
+          { title: { [Op.iLike]: `%${query.text}%` } },
+          { description: { [Op.iLike]: `%${query.text}%` } }
+        ];
       }
       
       // Set options
-      const sort = options.sort || { updatedAt: -1 };
       const limit = options.limit || 50;
-      const skip = options.skip || 0;
+      const offset = options.skip || 0;
+      
+      // Define order
+      let order = [['updatedAt', 'DESC']];
+      if (options.sort) {
+        order = Object.entries(options.sort).map(([key, value]) => [key, value === 1 ? 'ASC' : 'DESC']);
+      }
       
       // Execute query
-      const cursor = this.collections.content
-        .find(mongoQuery)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit);
-      
-      // Get results
-      const results = await cursor.toArray();
-      const total = await this.collections.content.countDocuments(mongoQuery);
+      const { count, rows } = await this.models.Content.findAndCountAll({
+        where: whereClause,
+        order,
+        limit,
+        offset
+      });
       
       return {
-        results,
-        total,
-        page: Math.floor(skip / limit) + 1,
+        results: rows.map(r => r.get({ plain: true })),
+        total: count,
+        page: Math.floor(offset / limit) + 1,
         pageSize: limit,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(count / limit)
       };
     } catch (error) {
       logger.error('Failed to search content', error);
@@ -408,24 +568,24 @@ class SharedDataStore {
     
     try {
       // Check if metadata already exists for this content
-      const existing = await this.collections.metadata.findOne({ contentId });
+      const existing = await this.models.Metadata.findOne({
+        where: { contentId }
+      });
       
       if (existing) {
         // Update existing metadata
-        await this.collections.metadata.updateOne(
-          { contentId },
+        await this.models.Metadata.update(
           { 
-            $set: { 
-              ...metadata,
-              updatedAt: new Date() 
-            } 
-          }
+            metadata,
+            updatedAt: new Date() 
+          },
+          { where: { contentId } }
         );
       } else {
         // Create new metadata document
-        await this.collections.metadata.insertOne({
+        await this.models.Metadata.create({
           contentId,
-          ...metadata,
+          metadata,
           createdAt: new Date(),
           updatedAt: new Date()
         });
@@ -450,8 +610,15 @@ class SharedDataStore {
     }
     
     try {
-      const metadata = await this.collections.metadata.findOne({ contentId });
-      return metadata;
+      const result = await this.models.Metadata.findOne({
+        where: { contentId }
+      });
+      
+      if (!result) {
+        return null;
+      }
+      
+      return result.get({ plain: true });
     } catch (error) {
       logger.error(`Failed to get metadata for content ${contentId}`, error);
       throw error;
@@ -477,12 +644,14 @@ class SharedDataStore {
       const assetDocument = {
         assetId,
         contentId,
-        createdAt: new Date(),
-        ...asset
+        url: asset.url || null,
+        assetType: asset.assetType || null,
+        data: asset,
+        createdAt: new Date()
       };
       
       // Save the asset
-      const result = await this.collections.assets.insertOne(assetDocument);
+      const result = await this.models.Asset.create(assetDocument);
       
       logger.debug(`Saved asset ${assetId} for content ${contentId}`);
       
@@ -505,15 +674,15 @@ class SharedDataStore {
     }
     
     try {
-      const query = { contentId };
+      const where = { contentId };
       
       if (assetType) {
-        query.assetType = assetType;
+        where.assetType = assetType;
       }
       
-      const assets = await this.collections.assets.find(query).toArray();
+      const assets = await this.models.Asset.findAll({ where });
       
-      return assets;
+      return assets.map(a => a.get({ plain: true }));
     } catch (error) {
       logger.error(`Failed to get assets for content ${contentId}`, error);
       throw error;
@@ -532,10 +701,10 @@ class SharedDataStore {
    * Close the database connection
    */
   async close() {
-    if (this.client) {
-      await this.client.close();
+    if (this.sequelize) {
+      await this.sequelize.close();
       this.isConnected = false;
-      logger.info('SharedDataStore disconnected from MongoDB');
+      logger.info('SharedDataStore disconnected from PostgreSQL');
     }
   }
 }

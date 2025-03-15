@@ -136,18 +136,10 @@ exports.generateContent = validate(Joi.object({
 
 exports.editContent = validate(Joi.object({
   contentId: Joi.string().required(),
-  changes: Joi.string().when('feedback', {
-    is: Joi.exist(),
-    then: Joi.optional(),
-    otherwise: Joi.required()
-  }),
-  feedback: Joi.string().when('changes', {
-    is: Joi.exist(),
-    then: Joi.optional(),
-    otherwise: Joi.required()
-  }),
+  changes: Joi.string(),
+  feedback: Joi.string(),
   userId: Joi.string()
-}));
+}).or('changes', 'feedback'));
 
 exports.generateHeadlines = validate(Joi.object({
   topic: Joi.string().required(),
@@ -269,11 +261,7 @@ exports.publishToCms = validateParamsAndBody(
   }),
   // Body schema
   Joi.object({
-    contentId: Joi.string().when('content', {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required()
-    }),
+    contentId: Joi.string(),
     content: Joi.object({
       title: Joi.string().required(),
       content: Joi.alternatives().try(
@@ -297,10 +285,6 @@ exports.publishToCms = validateParamsAndBody(
         description: Joi.string(),
         keywords: Joi.array().items(Joi.string())
       })
-    }).when('contentId', {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required()
     }),
     publish: Joi.boolean().default(true),
     options: Joi.object()
@@ -364,11 +348,7 @@ exports.postToSocial = validateParamsAndBody(
   }),
   // Body schema
   Joi.object({
-    contentId: Joi.string().when('content', {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required()
-    }),
+    contentId: Joi.string(),
     content: Joi.object({
       text: Joi.string().required(),
       media: Joi.array().items(
@@ -379,10 +359,6 @@ exports.postToSocial = validateParamsAndBody(
         })
       ),
       link: Joi.string().uri()
-    }).when('contentId', {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required()
     }),
     isThread: Joi.boolean().default(false),
     threadItems: Joi.array().items(

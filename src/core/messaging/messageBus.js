@@ -1,48 +1,38 @@
 // src/core/messaging/messageBus.js
-const amqp = require('amqplib');
+// Simplified in-memory message bus implementation (no RabbitMQ dependency)
 const config = require('../../config');
 const logger = require('../utils/logger');
+const EventEmitter = require('events');
 
 class MessageBus {
   constructor() {
-    this.connection = null;
-    this.channel = null;
+    this.eventEmitter = new EventEmitter();
     this.isConnected = false;
     this.subscriptions = new Map();
+    
+    // Set higher event listener limit to avoid warnings
+    this.eventEmitter.setMaxListeners(100);
   }
 
   async connect() {
     try {
-      // Connect to RabbitMQ
-      this.connection = await amqp.connect(config.messaging.uri);
-      this.channel = await this.connection.createChannel();
-      
-      // Create exchanges
-      await this.channel.assertExchange(config.messaging.exchanges.commands, 'direct', { durable: true });
-      await this.channel.assertExchange(config.messaging.exchanges.events, 'topic', { durable: true });
-      
-      // Set isConnected flag
+      // No actual connection needed - this is an in-memory implementation
       this.isConnected = true;
-      
-      logger.info('MessageBus connected successfully');
+      logger.info('MessageBus (in-memory) initialized successfully');
       return this;
     } catch (error) {
-      logger.error('Failed to connect to message broker', error);
+      logger.error('Failed to initialize message bus', error);
       throw error;
     }
   }
 
   async close() {
-    if (this.channel) {
-      await this.channel.close();
-    }
-    
-    if (this.connection) {
-      await this.connection.close();
-    }
+    // Remove all listeners
+    this.eventEmitter.removeAllListeners();
+    this.subscriptions.clear();
     
     this.isConnected = false;
-    logger.info('MessageBus connection closed');
+    logger.info('MessageBus closed');
   }
 
   async publishCommand(routingKey, data) {
@@ -51,15 +41,22 @@ class MessageBus {
     }
     
     try {
-      const success = this.channel.publish(
-        config.messaging.exchanges.commands,
-        routingKey,
-        Buffer.from(JSON.stringify(data)),
-        { persistent: true }
-      );
+      // Create the message envelope
+      const message = {
+        data,
+        metadata: {
+          type: routingKey,
+          timestamp: new Date(),
+          messageId: Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+        }
+      };
       
-      logger.debug(`Published command to ${routingKey}`, { success });
-      return success;
+      // Emit as command event
+      const eventName = `command:${routingKey}`;
+      this.eventEmitter.emit(eventName, message);
+      
+      logger.debug(`Published command to ${routingKey}`);
+      return true;
     } catch (error) {
       logger.error(`Failed to publish command to ${routingKey}`, error);
       throw error;
@@ -72,15 +69,32 @@ class MessageBus {
     }
     
     try {
-      const success = this.channel.publish(
-        config.messaging.exchanges.events,
-        routingKey,
-        Buffer.from(JSON.stringify(data)),
-        { persistent: true }
-      );
+      // Create the message envelope
+      const message = {
+        data,
+        metadata: {
+          type: routingKey,
+          timestamp: new Date(),
+          messageId: Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+        }
+      };
       
-      logger.debug(`Published event to ${routingKey}`, { success });
-      return success;
+      // Emit as event
+      const eventName = `event:${routingKey}`;
+      this.eventEmitter.emit(eventName, message);
+      
+      // Also emit for pattern matching subscribers
+      // This is a simplistic implementation - in a real system,
+      // you would need to implement proper topic matching
+      const parts = routingKey.split('.');
+      while (parts.length > 0) {
+        const pattern = parts.join('.') + '.*';
+        this.eventEmitter.emit(`event-pattern:${pattern}`, message);
+        parts.pop();
+      }
+      
+      logger.debug(`Published event to ${routingKey}`);
+      return true;
     } catch (error) {
       logger.error(`Failed to publish event to ${routingKey}`, error);
       throw error;
@@ -93,36 +107,29 @@ class MessageBus {
     }
     
     try {
-      // Create queue
-      const { queue } = await this.channel.assertQueue('', { exclusive: true });
+      const eventName = `command:${routingKey}`;
       
-      // Bind queue to exchange with routing key
-      await this.channel.bindQueue(queue, config.messaging.exchanges.commands, routingKey);
-      
-      // Consume messages
-      const consumer = await this.channel.consume(queue, async (msg) => {
-        if (!msg) return;
-        
+      // Create the event handler
+      const eventHandler = async (message) => {
         try {
-          const data = JSON.parse(msg.content.toString());
-          await handler(data, { 
+          await handler(message.data, { 
             type: routingKey, 
-            timestamp: new Date(msg.properties.timestamp),
-            messageId: msg.properties.messageId
+            timestamp: message.metadata.timestamp,
+            messageId: message.metadata.messageId
           });
-          
-          this.channel.ack(msg);
         } catch (error) {
           logger.error(`Error handling command ${routingKey}`, error);
-          this.channel.nack(msg);
         }
-      });
+      };
       
-      // Store subscription
-      this.subscriptions.set(`command:${routingKey}`, { queue, consumer });
+      // Register the handler
+      this.eventEmitter.on(eventName, eventHandler);
+      
+      // Store subscription for later cleanup
+      this.subscriptions.set(eventName, { eventHandler });
       
       logger.info(`Subscribed to command ${routingKey}`);
-      return { queue, consumer };
+      return { eventName, eventHandler };
     } catch (error) {
       logger.error(`Failed to subscribe to command ${routingKey}`, error);
       throw error;
@@ -135,36 +142,34 @@ class MessageBus {
     }
     
     try {
-      // Create queue
-      const { queue } = await this.channel.assertQueue('', { exclusive: true });
+      const eventName = `event:${pattern}`;
+      const patternEventName = `event-pattern:${pattern}`;
       
-      // Bind queue to exchange with pattern
-      await this.channel.bindQueue(queue, config.messaging.exchanges.events, pattern);
-      
-      // Consume messages
-      const consumer = await this.channel.consume(queue, async (msg) => {
-        if (!msg) return;
-        
+      // Create the event handler
+      const eventHandler = async (message) => {
         try {
-          const data = JSON.parse(msg.content.toString());
-          await handler(data, { 
-            type: msg.fields.routingKey, 
-            timestamp: new Date(msg.properties.timestamp),
-            messageId: msg.properties.messageId
+          await handler(message.data, { 
+            type: message.metadata.type, 
+            timestamp: message.metadata.timestamp,
+            messageId: message.metadata.messageId
           });
-          
-          this.channel.ack(msg);
         } catch (error) {
           logger.error(`Error handling event ${pattern}`, error);
-          this.channel.nack(msg);
         }
-      });
+      };
       
-      // Store subscription
-      this.subscriptions.set(`event:${pattern}`, { queue, consumer });
+      // Register the handler for exact matches
+      this.eventEmitter.on(eventName, eventHandler);
+      
+      // Register the handler for pattern matches
+      this.eventEmitter.on(patternEventName, eventHandler);
+      
+      // Store subscriptions for later cleanup
+      this.subscriptions.set(eventName, { eventHandler });
+      this.subscriptions.set(patternEventName, { eventHandler });
       
       logger.info(`Subscribed to event pattern ${pattern}`);
-      return { queue, consumer };
+      return { eventName, eventHandler };
     } catch (error) {
       logger.error(`Failed to subscribe to event pattern ${pattern}`, error);
       throw error;
@@ -175,8 +180,8 @@ class MessageBus {
     const subscriptionKey = `${type}:${key}`;
     
     if (this.subscriptions.has(subscriptionKey)) {
-      const { consumer } = this.subscriptions.get(subscriptionKey);
-      await this.channel.cancel(consumer.consumerTag);
+      const { eventHandler } = this.subscriptions.get(subscriptionKey);
+      this.eventEmitter.removeListener(subscriptionKey, eventHandler);
       this.subscriptions.delete(subscriptionKey);
       
       logger.info(`Unsubscribed from ${subscriptionKey}`);
@@ -184,6 +189,15 @@ class MessageBus {
     }
     
     return false;
+  }
+  
+  async getStatus() {
+    return {
+      connected: this.isConnected,
+      type: 'in-memory',
+      subscriptionCount: this.subscriptions.size,
+      maxListeners: this.eventEmitter.getMaxListeners()
+    };
   }
 }
 

@@ -6,10 +6,9 @@
 const BaseAgent = require('../../common/models/base-agent');
 
 class OptimisationAgent extends BaseAgent {
-  constructor(config, messaging, storage, logger, aiProvider) {
-    super(config, messaging, storage, logger);
-    this.aiProvider = aiProvider;
-    this.name = 'optimisation';
+  constructor(config) {
+    // Pass name along with config to super
+    super({...config, name: 'optimisation'});
   }
   
   async initialize() {

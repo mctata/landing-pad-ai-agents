@@ -61,6 +61,21 @@ async function initialize() {
   try {
     // Load configuration
     const config = await ConfigLoader.load();
+    
+    // Load agent configurations from config/agents.json
+    const fs = require('fs');
+    const path = require('path');
+    const agentConfigPath = path.join(__dirname, '../config/agents.json');
+    
+    if (fs.existsSync(agentConfigPath)) {
+      const agentConfigs = JSON.parse(fs.readFileSync(agentConfigPath, 'utf8'));
+      // Add agent configurations to the main config
+      config.agents = agentConfigs;
+      logger.info('Agent configurations loaded successfully');
+    } else {
+      logger.warn('Agent configuration file not found at: ' + agentConfigPath);
+    }
+    
     logger.info('Configuration loaded successfully');
     
     // Initialize core infrastructure
@@ -109,59 +124,53 @@ async function initialize() {
     }, logger);
     logger.info('AI provider service initialized');
     
-    // Initialize agents
-    agents = {
-      contentStrategy: new ContentStrategyAgent(
-        config.agents.content_strategy,
-        services.messageBus,
-        services.storage,
-        logger.child({ agent: 'content_strategy' }),
-        services.aiProvider
-      ),
+    // Initialize agents with proper error handling
+    try {
+      // Common agent configuration
+      const agentConfig = {
+        messageBus: services.messageBus,
+        dataStore: services.sharedDataStore,
+        storage: services.storage,
+        errorHandling: services.errorHandling,
+        aiProvider: services.aiProvider,
+        logger: logger,
+        // Include agent-specific configuration from config.agents
+        agentConfigs: config.agents || {}
+      };
       
-      contentCreation: new ContentCreationAgent(
-        config.agents.content_creation,
-        services.messageBus,
-        services.storage,
-        logger.child({ agent: 'content_creation' }),
-        services.aiProvider
-      ),
+      // Initialize each agent
+      agents = {
+        contentStrategy: withErrorHandling(
+          () => new ContentStrategyAgent(agentConfig),
+          { context: { operation: 'agent_initialization', agent: 'content_strategy' } }
+        )(),
+        
+        contentCreation: withErrorHandling(
+          () => new ContentCreationAgent(agentConfig),
+          { context: { operation: 'agent_initialization', agent: 'content_creation' } }
+        )(),
+        
+        contentManagement: withErrorHandling(
+          () => new ContentManagementAgent(agentConfig),
+          { context: { operation: 'agent_initialization', agent: 'content_management' } }
+        )(),
+        
+        optimisation: withErrorHandling(
+          () => new OptimisationAgent(agentConfig),
+          { context: { operation: 'agent_initialization', agent: 'optimisation' } }
+        )(),
+        
+        brandConsistency: withErrorHandling(
+          () => new BrandConsistencyAgent(agentConfig),
+          { context: { operation: 'agent_initialization', agent: 'brand_consistency' } }
+        )()
+      };
       
-      contentManagement: new ContentManagementAgent(
-        config.agents.content_management,
-        services.messageBus,
-        services.storage,
-        logger.child({ agent: 'content_management' }),
-        services.aiProvider
-      ),
-      
-      optimisation: new OptimisationAgent(
-        config.agents.optimisation,
-        services.messageBus,
-        services.storage,
-        logger.child({ agent: 'optimisation' }),
-        services.aiProvider
-      ),
-      
-      brandConsistency: new BrandConsistencyAgent(
-        config.agents.brand_consistency,
-        services.messageBus,
-        services.storage,
-        logger.child({ agent: 'brand_consistency' }),
-        services.aiProvider
-      )
-    };
-    
-    // Initialize each agent
-    for (const [name, agent] of Object.entries(agents)) {
-      await agent.initialize();
-      logger.info(`${name} agent initialized`);
-    }
-    
-    // Start each agent
-    for (const [name, agent] of Object.entries(agents)) {
-      await agent.start();
-      logger.info(`${name} agent started`);
+      logger.info(`All agents initialized successfully`);
+    } catch (error) {
+      // Log error but continue with available agents
+      logger.error('Error initializing one or more agents:', error);
+      logger.info('System will continue with available agents');
     }
     
     // Initialize web server
@@ -305,8 +314,13 @@ function setupGracefulShutdown() {
     // Stop each agent
     for (const [name, agent] of Object.entries(agents)) {
       try {
-        await agent.stop();
-        logger.info(`${name} agent stopped`);
+        // Check if agent has stop method before calling it
+        if (agent && typeof agent.stop === 'function') {
+          await agent.stop();
+          logger.info(`${name} agent stopped`);
+        } else {
+          logger.info(`${name} agent does not have stop method, skipping`);
+        }
       } catch (error) {
         logger.error(`Error stopping ${name} agent:`, error);
       }

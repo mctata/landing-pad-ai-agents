@@ -4,53 +4,91 @@
  */
 
 class BaseAgent {
-  constructor(config, messaging, storage, logger) {
-    this.config = config;
-    this.messaging = messaging;
-    this.storage = storage;
-    this.logger = logger;
+  constructor(config) {
+    // Extract services from config object
+    this.messaging = config.messageBus;
+    this.storage = config.storage;
+    this.logger = config.logger;
+    this.dataStore = config.dataStore;
+    this.errorHandling = config.errorHandling;
+    this.aiProvider = config.aiProvider;
+    
+    // Get the agent name from the config
+    this.name = config.name || 'unknown';
+    
+    // Try to get the specific agent configuration
+    if (config.agentConfigs) {
+      this.config = config.agentConfigs[this.name] || {};
+      
+      // If not found, log a warning
+      if (!config.agentConfigs[this.name]) {
+        if (config.logger) {
+          config.logger.warn(`Missing configuration for agent: ${this.name}. It may not be available.`);
+        }
+      }
+    } else {
+      this.config = {}; // Default empty config
+    }
+    
+    // Initialize modules map
     this.modules = new Map();
     this.isRunning = false;
   }
 
   async initialize() {
-    this.logger.info(`Initializing agent: ${this.config.name}`);
+    this.logger.info(`Initializing agent: ${this.name}`);
     
-    // Initialize modules
-    for (const [moduleName, moduleConfig] of Object.entries(this.config.modules)) {
-      if (moduleConfig.enabled) {
-        try {
-          const ModuleClass = require(`../../agents/${this.config.name}/modules/${this._kebabCase(moduleName)}`);
-          const moduleInstance = new ModuleClass(moduleConfig, this.storage, this.logger);
-          await moduleInstance.initialize();
-          this.modules.set(moduleName, moduleInstance);
-          this.logger.info(`Module initialized: ${moduleName}`);
-        } catch (error) {
-          this.logger.error(`Failed to initialize module ${moduleName}:`, error);
-          throw error;
+    // Skip module initialization if no modules are defined or this is a base agent
+    if (this.config.modules) {
+      // Initialize modules
+      for (const [moduleName, moduleConfig] of Object.entries(this.config.modules)) {
+        if (moduleConfig.enabled) {
+          try {
+            const ModuleClass = require(`../../agents/${this.name}/modules/${this._kebabCase(moduleName)}`);
+            const moduleInstance = new ModuleClass(moduleConfig, this.storage, this.logger);
+            await moduleInstance.initialize();
+            this.modules.set(moduleName, moduleInstance);
+            this.logger.info(`Module initialized: ${moduleName}`);
+          } catch (error) {
+            this.logger.error(`Failed to initialize module ${moduleName}:`, error);
+            // Log error but don't throw - allows agent to start even if module fails
+            this.logger.warn(`Continuing without module: ${moduleName}`);
+          }
         }
+      }
+    } else {
+      this.logger.warn(`No modules configured for agent: ${this.name}`);
+    }
+    
+    // Messaging setup - if messaging is available
+    if (this.messaging) {
+      try {
+        // Connect to message broker
+        if (!this.messaging.isConnected()) {
+          await this.messaging.connect();
+        }
+        
+        // Subscribe to command queue
+        await this.messaging.subscribe(
+          `${this.name}_commands`,
+          this.handleCommand.bind(this)
+        );
+      } catch (error) {
+        this.logger.error(`Error setting up messaging for agent ${this.name}:`, error);
+        this.logger.warn(`Agent ${this.name} will operate with limited functionality`);
       }
     }
     
-    // Connect to message broker
-    await this.messaging.connect();
-    
-    // Subscribe to command queue
-    await this.messaging.subscribe(
-      `${this.config.name}_commands`,
-      this.handleCommand.bind(this)
-    );
-    
-    this.logger.info(`Agent initialized: ${this.config.name}`);
+    this.logger.info(`Agent initialized: ${this.name}`);
   }
 
   async start() {
     if (this.isRunning) {
-      this.logger.warn(`Agent already running: ${this.config.name}`);
+      this.logger.warn(`Agent already running: ${this.name}`);
       return;
     }
     
-    this.logger.info(`Starting agent: ${this.config.name}`);
+    this.logger.info(`Starting agent: ${this.name}`);
     this.isRunning = true;
     
     // Start all modules
@@ -59,16 +97,16 @@ class BaseAgent {
       this.logger.info(`Module started: ${moduleName}`);
     }
     
-    this.logger.info(`Agent started: ${this.config.name}`);
+    this.logger.info(`Agent started: ${this.name}`);
   }
 
   async stop() {
     if (!this.isRunning) {
-      this.logger.warn(`Agent not running: ${this.config.name}`);
+      this.logger.warn(`Agent not running: ${this.name}`);
       return;
     }
     
-    this.logger.info(`Stopping agent: ${this.config.name}`);
+    this.logger.info(`Stopping agent: ${this.name}`);
     
     // Stop all modules
     for (const [moduleName, module] of this.modules.entries()) {
@@ -77,7 +115,7 @@ class BaseAgent {
     }
     
     this.isRunning = false;
-    this.logger.info(`Agent stopped: ${this.config.name}`);
+    this.logger.info(`Agent stopped: ${this.name}`);
   }
 
   async handleCommand(command) {

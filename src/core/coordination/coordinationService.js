@@ -498,9 +498,17 @@ class CoordinationService {
   async shutdown() {
     // Unsubscribe from all events
     for (const subscription of this.subscriptions) {
-      await subscription.unsubscribe();
+      try {
+        // Our MessageBus returns an object with eventName and eventHandler
+        if (subscription && subscription.eventName && subscription.eventHandler) {
+          await this.messageBus.unsubscribe(subscription.eventName.split(':')[0], subscription.eventName.split(':')[1]);
+        }
+      } catch (error) {
+        logger.error(`Error unsubscribing from event`, error);
+      }
     }
     
+    this.subscriptions = [];
     logger.info('Agent Coordination Service shut down');
   }
 }

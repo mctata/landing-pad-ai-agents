@@ -7,9 +7,13 @@
 const { randomBytes } = require('crypto');
 const csrf = require('csurf');
 const xss = require('xss-clean');
+// We're using PostgreSQL, but keeping the express-mongo-sanitize package for input sanitization
+// as it can help with general SQL injection prevention by removing $ and . characters
 const mongoSanitize = require('express-mongo-sanitize');
 const { rateLimit } = require('express-rate-limit');
-const { nanoid } = require('nanoid');
+// Use crypto for generating request IDs instead of nanoid (which is an ESM module)
+const crypto = require('crypto');
+const generateRequestId = () => crypto.randomBytes(8).toString('hex');
 const performance = require('perf_hooks').performance;
 
 /**
@@ -204,7 +208,9 @@ exports.validateApiKey = (options = {}) => {
     try {
       // Validate API key against database
       const db = req.app.locals.agentContainer.storage;
-      const keyRecord = await db.models.ApiKey.findOne({ key: apiKey, active: true });
+      const keyRecord = await db.models.ApiKey.findOne({ 
+        where: { key: apiKey, active: true } 
+      });
       
       if (!keyRecord) {
         return res.status(401).json({
@@ -232,12 +238,12 @@ exports.validateApiKey = (options = {}) => {
       }
       
       // Update last used timestamp
-      await db.models.ApiKey.updateLastUsed(keyRecord._id);
+      await db.models.ApiKey.updateLastUsed(keyRecord.keyId);
       
       // Attach API key info to request
       req.apiKeyInfo = {
-        id: keyRecord._id,
-        owner: keyRecord.owner,
+        id: keyRecord.keyId,
+        owner: keyRecord.userId,
         scopes: keyRecord.scopes
       };
       
@@ -259,7 +265,7 @@ exports.performanceMonitoring = (req, res, next) => {
   }
   
   // Generate unique request ID if not already present
-  req.requestId = req.headers['x-request-id'] || nanoid(16);
+  req.requestId = req.headers['x-request-id'] || generateRequestId();
   
   // Add request ID to response headers
   res.setHeader('X-Request-ID', req.requestId);
