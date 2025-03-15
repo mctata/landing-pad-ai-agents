@@ -80,16 +80,17 @@ See the `/examples/daily_outputs` directory for sample outputs including:
 The system is built around several core services that provide shared functionality:
 
 - **Messaging Service**: Handles communication between agents via RabbitMQ
-- **Storage Service**: Provides database access via MongoDB
+- **Storage Service**: Provides database access via PostgreSQL
 - **AI Provider Service**: Manages interaction with AI models from Anthropic and OpenAI
 
 ## Technology Stack
 
 - **Language**: JavaScript/Node.js
 - **Message Broker**: RabbitMQ
-- **Database**: MongoDB
+- **Database**: PostgreSQL with Sequelize ORM
 - **AI Models**: Anthropic Claude and OpenAI GPT models
 - **API Framework**: Express.js
+- **Container Platform**: Docker
 
 ## Getting Started
 
