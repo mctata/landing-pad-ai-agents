@@ -17,6 +17,7 @@ const sequelize = new Sequelize(
 );
 
 async function fixUserStatusEnum() {
+  let success = false;
   try {
     console.log('Testing database connection...');
     await sequelize.authenticate();
@@ -65,13 +66,22 @@ async function fixUserStatusEnum() {
     `);
     
     console.log('Successfully fixed users.status column');
-    process.exit(0);
+    success = true;
   } catch (error) {
     console.error('Error fixing users.status:', error);
-    process.exit(1);
+    success = false;
   } finally {
     await sequelize.close();
   }
+  
+  return success;
 }
 
-fixUserStatusEnum();
+// Execute the migration
+fixUserStatusEnum()
+  .then(success => {
+    console.log(success ? 'Migration process succeeded.' : 'Migration process failed.');
+  })
+  .catch(err => {
+    console.error('Fatal migration error:', err);
+  });

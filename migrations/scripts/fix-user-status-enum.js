@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = {
-  async up(queryInterface, Sequelize) {
+  async up(queryInterface, _Sequelize) {
     try {
       // Create the ENUM type if it doesn't exist
       await queryInterface.sequelize.query(`
@@ -34,7 +34,7 @@ module.exports = {
     }
   },
 
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface, _Sequelize) {
     try {
       // Convert back to STRING
       await queryInterface.sequelize.query(`

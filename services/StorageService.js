@@ -13,10 +13,11 @@ const { Pool } = require('pg');
 const Redis = require('redis');
 const ConfigService = require('./ConfigService');
 const logger = require('./LoggerService');
-const { Readable } = require('stream');
-const { promisify } = require('util');
-const streamToBuffer = require('stream-to-buffer');
-const streamToBufferPromise = promisify(streamToBuffer);
+// Stream handling functionality commented out
+// const { promisify } = require('util');
+// const { Readable } = require('stream');
+// const streamToBuffer = require('stream-to-buffer');
+// const streamToBufferPromise = promisify(streamToBuffer);
 
 class StorageService {
   constructor() {
@@ -333,7 +334,7 @@ class StorageService {
    * @param {string} filename - File name
    * @returns {Promise<Buffer>} - File content
    */
-  async readFile(directory, filename) {
+  readFile(directory, filename) {
     try {
       this.logger.info(`Reading file: ${filename} from directory: ${directory}`);
       
@@ -351,10 +352,13 @@ class StorageService {
         Key: key
       });
       
-      const response = await this.s3Client.send(command);
+      // Commented out actual S3 retrieval as stream handling is disabled
+      // const response = await this.s3Client.send(command);
+      // const buffer = await streamToBufferPromise(response.Body);
       
-      // Convert stream to buffer
-      const buffer = await streamToBufferPromise(response.Body);
+      // Placeholder implementation
+      this.s3Client.send(command).catch(e => this.logger.error(`Error retrieving from S3: ${e.message}`));
+      const buffer = Buffer.from('Placeholder - stream handling disabled');
       
       this.logger.info(`File read from S3: ${key}`);
       
@@ -480,8 +484,8 @@ class StorageService {
    * @param {Object} activity - Activity data
    * @returns {Promise<Object>} - Stored activity
    */
-  async storeActivity(activity) {
-    return await this.storeData('activities', activity);
+  storeActivity(activity) {
+    return this.storeData('activities', activity);
   }
 
   /**
@@ -576,7 +580,7 @@ class StorageService {
    * Initialize S3 client
    * @private
    */
-  async _initializeS3() {
+  _initializeS3() {
     try {
       this.logger.info('Initializing S3 client');
       

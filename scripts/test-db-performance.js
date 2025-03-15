@@ -1,7 +1,7 @@
 'use strict';
 
 require('dotenv').config();
-const { Sequelize, Op } = require('sequelize');
+const { Sequelize } = require('sequelize');
 const { performance } = require('perf_hooks');
 
 // Create Sequelize instance
@@ -28,7 +28,7 @@ async function measureTime(description, callback) {
 }
 
 // Test DB schema
-async function testSchema() {
+function testSchema() {
   return measureTime('Verifying database schema', async () => {
     // Get table list
     const [tables] = await sequelize.query(`
@@ -86,7 +86,7 @@ async function testFullTextSearch() {
     
     return measureTime('Testing full-text search performance', async () => {
       // Query with the full-text search index
-      const [results, metadata] = await sequelize.query(`
+      const [results, _metadata] = await sequelize.query(`
         SELECT id, title FROM contents 
         WHERE search_vector @@ plainto_tsquery('english', 'marketing content') 
         ORDER BY ts_rank(search_vector, plainto_tsquery('english', 'marketing content')) DESC
@@ -119,7 +119,7 @@ async function testWorkflowStepsPerformance() {
     
     return measureTime('Testing workflow steps query performance', async () => {
       // Query using the workflow_steps table (relational)
-      const [results, metadata] = await sequelize.query(`
+      const [results, _metadata] = await sequelize.query(`
         SELECT w.id, w.name, COUNT(ws.id) as step_count
         FROM workflows w
         LEFT JOIN workflow_steps ws ON w.id = ws.workflow_id
@@ -153,7 +153,7 @@ async function testUserIndexPerformance() {
     
     return measureTime('Testing user index performance', async () => {
       // Query with email index
-      const [results1, metadata1] = await sequelize.query(`
+      const [results1, _metadata1] = await sequelize.query(`
         EXPLAIN ANALYZE
         SELECT * FROM users WHERE email = 'admin@example.com';
       `);
@@ -161,7 +161,7 @@ async function testUserIndexPerformance() {
       results1.forEach(r => console.log(Object.values(r)[0]));
       
       // Query with status field
-      const [results2, metadata2] = await sequelize.query(`
+      const [results2, _metadata2] = await sequelize.query(`
         EXPLAIN ANALYZE
         SELECT COUNT(*) FROM users WHERE status = 'active';
       `);
@@ -222,7 +222,7 @@ async function testContentMetricsPerformance() {
     }
     
     return measureTime('Testing content metrics query performance', async () => {
-      const [results, metadata] = await sequelize.query(`
+      const [results, _metadata] = await sequelize.query(`
         SELECT c.id, c.title, COUNT(m.id) as metrics_count
         FROM contents c
         LEFT JOIN metrics m ON ${joinCondition}
@@ -241,6 +241,7 @@ async function testContentMetricsPerformance() {
 
 // Run database performance tests
 async function runPerformanceTests() {
+  let success = false;
   try {
     console.log('Testing database connection...');
     await sequelize.authenticate();
@@ -255,11 +256,22 @@ async function runPerformanceTests() {
     await testContentMetricsPerformance();
     
     console.log('\n=== PERFORMANCE TESTS COMPLETED ===');
+    success = true;
   } catch (error) {
     console.error('Performance test error:', error);
+    success = false;
   } finally {
     await sequelize.close();
   }
+  
+  return success;
 }
 
-runPerformanceTests();
+// Execute performance tests
+runPerformanceTests()
+  .then(success => {
+    console.log(success ? 'Performance testing succeeded.' : 'Performance testing failed.');
+  })
+  .catch(err => {
+    console.error('Fatal performance testing error:', err);
+  });

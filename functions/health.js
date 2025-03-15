@@ -2,7 +2,7 @@
 
 // Simple serverless function to check system health
 
-exports.handler = async (event, context) => {
+exports.handler = (_event, _context) => {
   return {
     statusCode: 200,
     headers: {
