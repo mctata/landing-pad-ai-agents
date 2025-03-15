@@ -23,13 +23,16 @@ jest.mock('../../../../src/config', () => ({
   },
   monitoring: {
     checkInterval: 500, // Short interval for testing
-    heartbeatTimeout: 1000 // Short timeout for testing
+    heartbeatTimeout: 1000, // Short timeout for testing
+    recoveryThreshold: 3, // Attempt recovery after 3 failures
+    recoveryBackoff: 1000 // Backoff time in ms
   }
 }));
 
 // Import after mocks
 const { getInstance } = require('../../../../src/core/monitoring/healthMonitoringService');
 const { getInstance: getMessageBus } = require('../../../../src/core/messaging/messageBus');
+const AgentRecoveryService = require('../../../../src/core/error/agentRecoveryService');
 
 describe('HealthMonitoringService Integration', () => {
   let healthMonitoringService;
@@ -224,5 +227,164 @@ describe('HealthMonitoringService Integration', () => {
     
     // Agent should be removed from in-memory map
     expect(healthMonitoringService.agents.has(agentId)).toBe(false);
+  });
+
+  it('should track and report system-wide metrics', async () => {
+    // Arrange
+    const agentCount = 3;
+    const agentIds = [];
+    
+    // Create multiple test agents
+    for (let i = 0; i < agentCount; i++) {
+      const agentId = `metrics-agent-${i}-${Date.now()}`;
+      agentIds.push(agentId);
+      
+      await healthMonitoringService.registerAgent(agentId, { 
+        type: i === 0 ? 'content_creation' : 
+              i === 1 ? 'content_strategy' : 'optimisation' 
+      });
+      
+      // Simulate heartbeats with metrics
+      await healthMonitoringService.handleHeartbeat({
+        agentId,
+        status: 'online',
+        metrics: {
+          responseTime: 100 + i * 50,
+          memory: { heapUsed: 1000000 + i * 500000 },
+          operations: i * 5
+        }
+      });
+    }
+    
+    // Act
+    const systemMetrics = await healthMonitoringService.getSystemMetrics();
+    
+    // Assert
+    expect(systemMetrics).toBeDefined();
+    expect(systemMetrics.totalAgents).toBe(agentCount);
+    expect(systemMetrics.agentsByStatus.online).toBe(agentCount);
+    
+    // Cleanup
+    for (const agentId of agentIds) {
+      await healthMonitoringService.collection.deleteOne({ agentId });
+    }
+  });
+
+  it('should implement automated recovery for chronically failing agents', async () => {
+    // Arrange
+    const messageBus = await getMessageBus();
+    const failingAgentId = 'chronic-failure-agent-' + Date.now();
+    
+    // Register agent
+    await healthMonitoringService.registerAgent(failingAgentId, { 
+      type: 'content_creation',
+      modules: ['blog-generator', 'social-media-generator']
+    });
+    
+    // Mock the recovery service
+    const mockRecoveryService = new AgentRecoveryService();
+    const spyRecover = jest.spyOn(mockRecoveryService, 'recoverAgent')
+      .mockImplementation(() => Promise.resolve({ success: true }));
+    
+    // Inject mock recovery service
+    healthMonitoringService.recoveryService = mockRecoveryService;
+    
+    // Act - Simulate multiple failures
+    for (let i = 0; i < 5; i++) {
+      await healthMonitoringService.handleStatusChange({
+        agentId: failingAgentId,
+        status: 'failed',
+        reason: `Failure #${i+1}`
+      });
+      
+      // Wait a bit between failures
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Allow time for recovery to be triggered
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Assert
+    expect(spyRecover).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: failingAgentId }),
+      expect.anything()
+    );
+    
+    // Verify status has been updated to recovering
+    const agent = await healthMonitoringService.collection.findOne({ agentId: failingAgentId });
+    expect(agent.status).toBe('recovering');
+    
+    // Cleanup
+    spyRecover.mockRestore();
+    await healthMonitoringService.collection.deleteOne({ agentId: failingAgentId });
+  });
+
+  it('should escalate issues when recovery attempts fail repeatedly', async () => {
+    // Arrange
+    const messageBus = await getMessageBus();
+    const unrecoverableAgentId = 'unrecoverable-agent-' + Date.now();
+    
+    // Insert agent with multiple failed recovery attempts
+    await healthMonitoringService.collection.insertOne({
+      agentId: unrecoverableAgentId,
+      status: 'failed',
+      statusReason: 'Persistent failure',
+      metadata: { type: 'brand_consistency' },
+      recoveryAttempts: 5, // Multiple failed attempts
+      lastRecoveryAttempt: new Date(Date.now() - 60000),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastHeartbeat: new Date(Date.now() - 300000) // 5 minutes ago
+    });
+    
+    // Act - Run health check
+    await healthMonitoringService.checkAgentsHealth();
+    
+    // Assert - Should publish a critical issue event
+    expect(messageBus.publishEvent).toHaveBeenCalledWith(
+      'system.issue',
+      expect.objectContaining({
+        severity: 'critical',
+        source: unrecoverableAgentId,
+        message: expect.stringContaining('recovery failed')
+      })
+    );
+    
+    // Cleanup
+    await healthMonitoringService.collection.deleteOne({ agentId: unrecoverableAgentId });
+  });
+
+  it('should calculate system health score based on agent statuses', async () => {
+    // Arrange - Create agents with different statuses
+    const agentData = [
+      { id: 'health-test-1-' + Date.now(), status: 'online', type: 'content_creation' },
+      { id: 'health-test-2-' + Date.now(), status: 'online', type: 'content_strategy' },
+      { id: 'health-test-3-' + Date.now(), status: 'degraded', type: 'optimisation' },
+      { id: 'health-test-4-' + Date.now(), status: 'failed', type: 'brand_consistency' }
+    ];
+    
+    // Register all test agents
+    for (const agent of agentData) {
+      await healthMonitoringService.registerAgent(agent.id, { type: agent.type });
+      await healthMonitoringService.handleStatusChange({
+        agentId: agent.id,
+        status: agent.status,
+        reason: 'Test setup'
+      });
+    }
+    
+    // Act
+    const healthSummary = await healthMonitoringService.getSystemHealthSummary();
+    
+    // Assert
+    expect(healthSummary).toBeDefined();
+    expect(healthSummary.healthScore).toBeLessThan(100); // Score should be reduced due to issues
+    expect(healthSummary.status).toBe('degraded'); // System should be degraded with failing agents
+    expect(healthSummary.issues).toHaveLength(2); // Should have two issues (degraded + failed)
+    
+    // Cleanup
+    for (const agent of agentData) {
+      await healthMonitoringService.collection.deleteOne({ agentId: agent.id });
+    }
   });
 });
