@@ -81,7 +81,7 @@
     "aws-sdk": "^2.1575.0",
     "@aws-sdk/client-s3": "^3.328.0",
     "@aws-sdk/s3-request-presigner": "^3.328.0",
-    "mongodb": "^5.9.1",
+    "umzug": "^3.4.0",
     "axios": "^1.6.2",
     "bcrypt": "^5.1.1",
     "chart.js": "^4.4.0",

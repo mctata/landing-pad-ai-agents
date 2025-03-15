@@ -13,8 +13,12 @@ services:
       - PORT=3000
       
       # Database settings
-      - MONGODB_URI=${MONGODB_URI}
-      - MONGODB_DATABASE=${MONGODB_DATABASE:-landing_pad_ai_agents}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-agents_db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_SSL=${DB_SSL:-true}
       
       # Message queue
       - RABBITMQ_URL=${RABBITMQ_URL}

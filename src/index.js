@@ -12,7 +12,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
 const { createLogger, format, transports } = require('winston');
-const { MongoClient } = require('mongodb');
+const { Sequelize } = require('sequelize');
 const amqp = require('amqplib');
 
 // Import core infrastructure
@@ -76,19 +76,17 @@ async function initialize() {
     services.coordinationService = await getCoordinationService();
     logger.info('Coordination Service initialized');
     
-    // Initialize MongoDB and database service
+    // Initialize PostgreSQL and database service
     const DatabaseService = require('./common/services/databaseService');
     
-    // Configure database
-    const dbConfig = {
-      uri: process.env.MONGODB_URI,
-      database: process.env.MONGODB_DATABASE || 'landing_pad_ai_agents'
-    };
+    // Configure database from environment config
+    const env = process.env.NODE_ENV || 'development';
+    const dbConfig = config.database.postgres;
     
     // Initialize database service
-    services.database = new DatabaseService(dbConfig, logger);
+    services.database = new DatabaseService(dbConfig);
     await services.database.connect();
-    logger.info('Connected to MongoDB and database service initialized');
+    logger.info('Connected to PostgreSQL and database service initialized');
     
     // Initialize storage service
     services.storage = new StorageService(services.database.models);
@@ -185,7 +183,6 @@ function initializeWebServer() {
   const cookieParser = require('cookie-parser');
   const session = require('express-session');
   const { rateLimit } = require('express-rate-limit');
-  const MongoStore = require('connect-mongo');
   
   // Configure middleware
   // Apply Helmet with enhanced security settings 
@@ -217,6 +214,7 @@ function initializeWebServer() {
   app.use(cookieParser(process.env.COOKIE_SECRET));
   
   // Configure sessions with secure settings
+  const pgSession = require('connect-pg-simple')(session);
   app.use(session({
     secret: process.env.SESSION_SECRET || 'session-secret',
     name: 'landing-pad-session',
@@ -229,8 +227,9 @@ function initializeWebServer() {
     rolling: true,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
+    store: new pgSession({
+      conString: services.database.sequelize.config.database,
+      tableName: 'sessions',
       ttl: 24 * 60 * 60 // 24 hours in seconds
     })
   }));
